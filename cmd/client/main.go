@@ -10,32 +10,29 @@ import (
 	"os"
 	"strings"
 
+	"github.com/michaelmacinnis/summit/pkg/config"
 	"github.com/michaelmacinnis/summit/pkg/comms"
 	"github.com/michaelmacinnis/summit/pkg/errors"
 	"github.com/michaelmacinnis/summit/pkg/message"
 	"github.com/michaelmacinnis/summit/pkg/terminal"
 )
 
-const (
-	sock = "/tmp/summit.sock"
-)
-
 func main() {
 	defer errors.Exit(0)
+
+	path := ""
+	flag.StringVar(&path, "p", path, "routing path")
+	flag.Parse()
 
 	restore, err := terminal.MakeRaw()
 	errors.On(err).Die("failed to put terminal in raw mode")
 
 	errors.AtExit(restore)
 
-	c, err := net.Dial("unix", sock)
+	c, err := net.Dial("unix", config.Socket())
 	errors.On(err).Die("failed to connect to server")
 
 	errors.AtExit(c.Close)
-
-	path := ""
-	flag.StringVar(&path, "p", path, "routing path")
-	flag.Parse()
 
 	for _, s := range strings.Split(path, "-") {
 		if s != "" {
@@ -43,7 +40,8 @@ func main() {
 		}
 	}
 
-	c.Write(message.Run(flag.Args()))
+	args, _ := config.Command()
+	c.Write(message.Run(args))
 
 	fromServer := comms.Chunk(c)
 	fromTerminal := comms.Chunk(os.Stdin)

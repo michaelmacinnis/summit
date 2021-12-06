@@ -3,6 +3,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"net"
@@ -11,6 +12,7 @@ import (
 	"strconv"
 
 	"github.com/michaelmacinnis/summit/pkg/comms"
+	"github.com/michaelmacinnis/summit/pkg/config"
 	"github.com/michaelmacinnis/summit/pkg/errors"
 	"github.com/michaelmacinnis/summit/pkg/message"
 	"github.com/michaelmacinnis/summit/pkg/session"
@@ -44,10 +46,9 @@ func Write(wc io.WriteCloser) chan [][]byte {
 
 // TODO: allow overrides at the command line or with an environment variable.
 var (
-	addr = "/tmp/summit.sock"
-	client = "summit-client"
-	emulator = "kitty"
-	mux = "summit-mux"
+	client = config.Get("SUMMIT_CLIENT", "summit-client")
+	mux = config.Get("SUMMIT_MUX", "summit-mux")
+	term = config.Get("SUMMIT_TERMINAL", "kitty")
 )
 
 func launch(path string) (*exec.Cmd, chan *message.T, chan [][]byte) {
@@ -69,9 +70,9 @@ func launch(path string) (*exec.Cmd, chan *message.T, chan [][]byte) {
 }
 
 func listen(accepted chan net.Conn) {
-	os.Remove(addr)
+	os.Remove(config.Socket())
 
-    l, err := net.Listen("unix", addr)
+    l, err := net.Listen("unix", config.Socket())
     errors.On(err).Die("listen error")
 
     defer l.Close()
@@ -203,9 +204,9 @@ func window(m *message.T, routing [][]byte) {
 	}
 	args = append(args, m.Args()...)
 
-	println("REQUEST:", fmt.Sprintf("%s %v", emulator, args))
+	println("REQUEST:", fmt.Sprintf("%s %v", term, args))
 
-    cmd := exec.Command(emulator, args...)
+    cmd := exec.Command(term, args...)
 
     cmd.Stderr = os.Stderr
 
@@ -216,6 +217,11 @@ func window(m *message.T, routing [][]byte) {
 }
 
 func main() {
+	flag.StringVar(&client, "c", client, "path to summit client")
+	flag.StringVar(&mux, "m", mux, "path to summit mux")
+	flag.StringVar(&term, "t", term, "path to terminal emulator")
+	flag.Parse()
+
 	cmd, r, w := launch(mux)
 
 	accepted := make(chan net.Conn)

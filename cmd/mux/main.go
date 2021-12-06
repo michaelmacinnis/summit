@@ -4,11 +4,15 @@ package main
 
 import (
 	"flag"
+	"fmt"
     "os"
     "os/exec"
+	"sync/atomic"
+
     "github.com/creack/pty"
 
     "github.com/michaelmacinnis/summit/pkg/comms"
+    "github.com/michaelmacinnis/summit/pkg/config"
     "github.com/michaelmacinnis/summit/pkg/errors"
     "github.com/michaelmacinnis/summit/pkg/message"
     "github.com/michaelmacinnis/summit/pkg/terminal"
@@ -19,7 +23,10 @@ type Status struct {
     rv int
 }
 
-var label = "unknown"
+var (
+	label = "unknown"
+	muxing = uint32(0)
+)
 
 func log(out chan [][]byte, format string, i ...interface{}) {
 	out <- [][]byte{message.Log(label + ": " + format, i...).Bytes()}
@@ -149,12 +156,17 @@ func session(id string, in chan *message.T, out chan [][]byte, status chan Statu
 }
 
 func main() {
+	request := false
+
 	flag.StringVar(&label, "l", label, "mux label (for debugging)")
+	flag.BoolVar(&request, "n", request, "request new local session")
 	flag.Parse()
 
-	args := flag.Args()
-    if len(args) > 1 && args[0] == "new" {
-		os.Stdout.Write(message.Run(args[1:]))
+	args, explicit := config.Command()
+	println("args", explicit, fmt.Sprintf("%v", args))
+
+    if request {
+		os.Stdout.Write(message.Run(args))
 		return
 	}
 
@@ -171,7 +183,8 @@ func main() {
 
 	id := "0"
 
-	if terminal.IsTTY() && len(args) > 0 {
+	if terminal.IsTTY() && explicit {
+		println("launching", fmt.Sprintf("%v", args))
 		// TODO: Launch as shim.
 		c := make(chan *message.T)
 		stream[id] = c
@@ -203,6 +216,8 @@ func main() {
 				}
 
 				if m.Is(message.Escape) {
+					atomic.StoreUint32(&muxing, 1)
+
 					log(toServer, "mux received: %v", m.Parsed())
 
 					switch m.Command() {
@@ -264,6 +279,10 @@ func main() {
 			case s := <-status:
 				close(stream[s.id])
 				delete(stream, s.id)
+
+				if s.id == "0" && atomic.LoadUint32(&muxing) == 0 {
+					errors.Exit(s.rv)
+				}
 		}
 	}
 }
