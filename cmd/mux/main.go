@@ -5,34 +5,35 @@ package main
 import (
 	"flag"
 	"fmt"
-    "os"
-    "os/exec"
+	"os"
+	"os/exec"
 	"sync/atomic"
 
-    "github.com/creack/pty"
+	"github.com/creack/pty"
 
-    "github.com/michaelmacinnis/summit/pkg/comms"
-    "github.com/michaelmacinnis/summit/pkg/config"
-    "github.com/michaelmacinnis/summit/pkg/errors"
-    "github.com/michaelmacinnis/summit/pkg/message"
-    "github.com/michaelmacinnis/summit/pkg/terminal"
+	"github.com/michaelmacinnis/summit/pkg/comms"
+	"github.com/michaelmacinnis/summit/pkg/config"
+	"github.com/michaelmacinnis/summit/pkg/errors"
+	"github.com/michaelmacinnis/summit/pkg/message"
+	"github.com/michaelmacinnis/summit/pkg/terminal"
 )
 
 type Status struct {
-    id string
-    rv int
+	id string
+	rv int
 }
 
 var (
-	label = "unknown"
-	muxing = uint32(0)
+	label  = "unknown"
+	muxing = int32(0)
+	status = 0
 )
 
 func log(out chan [][]byte, format string, i ...interface{}) {
-	out <- [][]byte{message.Log(label + ": " + format, i...).Bytes()}
+	// out <- [][]byte{message.Log(label + ": " + format, i...).Bytes()}
 }
 
-func session(id string, in chan *message.T, out chan [][]byte, status chan Status) {
+func session(id string, in chan *message.T, out chan [][]byte, statusq chan Status) {
 	log(out, "launching %s", id)
 
 	m := <-in
@@ -47,16 +48,16 @@ func session(id string, in chan *message.T, out chan [][]byte, status chan Statu
 		println(err.Error())
 
 		code := cmd.ProcessState.ExitCode()
-		status <- Status{id, code}
+		statusq <- Status{id, code}
 
-		out <-append(hdr[:1], message.Status(code))
+		out <- append(hdr[:1], message.Status(code))
 	}
 
 	defer func() {
 		_ = f.Close() // Best effort.
 	}()
 
-	//println("session: started")
+	// println("session: started")
 
 	fromProgram := comms.Chunk(f)
 	toProgram := comms.Write(f)
@@ -68,11 +69,18 @@ func session(id string, in chan *message.T, out chan [][]byte, status chan Statu
 		sent := false
 
 		for m := range fromProgram {
-			if m.Is(message.Escape) && m.Command() != "status" {
+			if m.Is(message.Escape) {
 				if sent {
 					buffered = make([][]byte, len(hdr))
 					copy(buffered, hdr)
 					sent = false
+				}
+
+				n := int32(m.Mux())
+				if n != 0 {
+					atomic.AddInt32(&muxing, n)
+					out <- [][]byte{m.Bytes()}
+					continue
 				}
 
 				if m.Logging() {
@@ -92,18 +100,12 @@ func session(id string, in chan *message.T, out chan [][]byte, status chan Statu
 				}
 			}
 
-			//println("session: sending", m.String())
+			// println("session: sending", m.String())
 
-			//println("mux:", len(buffered))
+			// println("mux:", len(buffered))
 
 			out <- append(buffered, m.Bytes())
 			sent = true
-
-			if m.Command() == "status" {
-				buffered = make([][]byte, len(hdr))
-				copy(buffered, hdr)
-				sent = false
-			}
 		}
 	}()
 
@@ -112,10 +114,10 @@ func session(id string, in chan *message.T, out chan [][]byte, status chan Statu
 		routing := 0
 
 		for m := range in {
-			//println("session: received", m.String())
+			// println("session: received", m.String())
 
 			if m.Is(message.Escape) {
-				if m.Command() != "run" && m.Command() != "status" {
+				if m.Command() != "run" {
 					buffered = append(buffered, m.Bytes())
 				}
 
@@ -128,18 +130,17 @@ func session(id string, in chan *message.T, out chan [][]byte, status chan Statu
 					if err := pty.Setsize(f, ws); err != nil {
 						println("error setting window size:", err.Error())
 					}
-
 				}
 
-				if m.Command() != "run" && m.Command() != "status" {
+				if m.Command() != "run" {
 					continue
 				}
 			}
 
-			if routing > 0 || m.Command() == "run" || m.Command() == "status" {
-				toProgram <-append(buffered, m.Bytes())
+			if routing > 0 || m.Command() == "run" {
+				toProgram <- append(buffered, m.Bytes())
 			} else {
-				toProgram <-[][]byte{m.Bytes()}
+				toProgram <- [][]byte{m.Bytes()}
 			}
 
 			buffered = [][]byte{}
@@ -150,9 +151,9 @@ func session(id string, in chan *message.T, out chan [][]byte, status chan Statu
 	cmd.Wait()
 
 	code := cmd.ProcessState.ExitCode()
-	status <- Status{id, code}
+	statusq <- Status{id, code}
 
-	out <-append(hdr, message.Status(code))
+	out <- append(hdr, message.Status(code))
 }
 
 func main() {
@@ -163,14 +164,12 @@ func main() {
 	flag.Parse()
 
 	args, explicit := config.Command()
-	println("args", explicit, fmt.Sprintf("%v", args))
+	// println("args", explicit, fmt.Sprintf("%v", args))
 
-    if request {
+	if request {
 		os.Stdout.Write(message.Run(args))
 		return
 	}
-
-	defer errors.Exit(0)
 
 	stream := map[string]chan *message.T{}
 
@@ -179,7 +178,13 @@ func main() {
 	fromServer := comms.Chunk(os.Stdin)
 	toServer := comms.Write(os.Stdout)
 
-	status := make(chan Status) // Pty ID + exit status.
+	toServer <- [][]byte{message.Mux(1)}
+	defer func() {
+		toServer <- [][]byte{message.Mux(-1)}
+		errors.Exit(status)
+	}()
+
+	statusq := make(chan Status) // Pty ID + exit status.
 
 	id := "0"
 
@@ -194,7 +199,7 @@ func main() {
 
 		errors.AtExit(restore)
 
-		go session(id, c, toServer, status)
+		go session(id, c, toServer, statusq)
 		c <- message.New(message.Escape, message.Terminal(""))
 		c <- message.New(message.Escape, message.Run(args))
 
@@ -210,79 +215,71 @@ func main() {
 
 	for {
 		select {
-			case m := <-fromServer:
-				if m == nil {
-					return
-				}
+		case m := <-fromServer:
+			if m == nil {
+				return
+			}
 
-				if m.Is(message.Escape) {
-					atomic.StoreUint32(&muxing, 1)
+			if m.Is(message.Escape) {
+				log(toServer, "mux received: %v", m.Parsed())
 
-					log(toServer, "mux received: %v", m.Parsed())
-
-					switch m.Command() {
-					case "pty":
-						if selected == nil {
-							id = m.Pty()
-							selected = stream[id]
-							continue
-						}
-
-						fallthrough
-					case "term":
-						buffered = append(buffered, m)
-
-						continue
-
-					case "run":
-						if selected == nil {
-							id = <-next
-							selected = make(chan *message.T)
-
-							stream[id] = selected
-
-							for _, v := range buffered {
-								log(toServer, "buffered: %v", v.Parsed())
-							}
-
-							go session(id, selected, toServer, status)
-/*
-						} else {
-							buffered = append(buffered, m)
-							continue
-*/
-						}
-
-					case "status":
-						if selected == nil {
-							errors.Exit(m.Status())
-						}
-					}
-				}
-
-				if selected == nil {
-					selected = stream[id]
+				switch m.Command() {
+				case "pty":
 					if selected == nil {
+						id = m.Pty()
+						selected = stream[id]
 						continue
 					}
+
+					fallthrough
+				case "term":
+					buffered = append(buffered, m)
+
+					continue
+
+				case "run":
+					if selected == nil {
+						id = <-next
+						selected = make(chan *message.T)
+
+						stream[id] = selected
+
+						for _, v := range buffered {
+							log(toServer, "buffered: %v", v.Parsed())
+						}
+
+						go session(id, selected, toServer, statusq)
+					}
 				}
+			}
 
-				for _, b := range buffered {
-					selected <- b
+			if selected == nil {
+				selected = stream[id]
+				if selected == nil {
+					continue
 				}
-				buffered = []*message.T{}
+			}
 
-				selected <- m
+			for _, b := range buffered {
+				selected <- b
+			}
+			buffered = []*message.T{}
 
-				selected = nil
+			selected <- m
 
-			case s := <-status:
-				close(stream[s.id])
-				delete(stream, s.id)
+			selected = nil
 
-				if s.id == "0" && atomic.LoadUint32(&muxing) == 0 {
-					errors.Exit(s.rv)
-				}
+		case s := <-statusq:
+			close(stream[s.id])
+			delete(stream, s.id)
+
+			if s.id == "0" {
+				status = s.rv
+			}
+
+			if len(stream) == 0 && atomic.LoadInt32(&muxing) == 0 {
+				return;
+			}
 		}
 	}
 }

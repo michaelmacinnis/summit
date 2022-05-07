@@ -3,41 +3,41 @@
 package terminal
 
 import (
-    "fmt"
-    "os"
-    "os/signal"
-    "syscall"
+	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 
-    "github.com/creack/pty"
-    "golang.org/x/term"
+	"github.com/creack/pty"
+	"golang.org/x/term"
 
-    "github.com/michaelmacinnis/summit/pkg/message"
+	"github.com/michaelmacinnis/summit/pkg/message"
 )
 
-func ForwardResize(f func (b []byte)) func() error {
+func ForwardResize(f func(b []byte)) func() error {
 	fd := os.Stdin
 
-    signals := make(chan os.Signal, 1)
-    signal.Notify(signals, syscall.SIGWINCH)
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGWINCH)
 
-    go func() {
-        for range signals {
-            ws, err := pty.GetsizeFull(fd)
-            if err != nil {
-                fmt.Printf("error getting window size: %s\n", err.Error)
-                continue
-            }
+	go func() {
+		for range signals {
+			ws, err := pty.GetsizeFull(fd)
+			if err != nil {
+				fmt.Printf("error getting window size: %s\n", err.Error)
+				continue
+			}
 
 			f(message.Serialize(map[string]interface{}{
 				"cmd": "set-window-size",
 				"ws":  &ws,
 			}))
-        }
-    }()
+		}
+	}()
 
-    signals <- syscall.SIGWINCH
+	signals <- syscall.SIGWINCH
 
-    return func() error {
+	return func() error {
 		signal.Stop(signals)
 		close(signals)
 

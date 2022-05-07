@@ -24,8 +24,7 @@ func AtExit(f func() error) {
 func Die(format string, a ...interface{}) {
 	println(fmt.Sprintf(format, a...))
 
-    Exit(1)
-
+	Exit(1)
 }
 
 func Exit(code int) {
@@ -52,7 +51,7 @@ func On(err error) handler {
 
 var (
 	deferred = []func() error{}
-	mutex = sync.Mutex{}
+	mutex    = sync.Mutex{}
 )
 
 type handler interface {
@@ -63,7 +62,7 @@ type null struct{}
 
 func (n null) Die(format string, a ...interface{}) {}
 
-type real struct{error}
+type real struct{ error }
 
 func (r real) Die(format string, a ...interface{}) {
 	if format != "" {

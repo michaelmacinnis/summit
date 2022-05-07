@@ -8,10 +8,9 @@ import (
 	"encoding/json"
 )
 
-
 var (
 	CRLF = []byte{13, 10}
-	EOT = []byte{4}
+	EOT  = []byte{4}
 )
 
 func Deserialize(b []byte) map[string]interface{} {
@@ -24,51 +23,51 @@ func Deserialize(b []byte) map[string]interface{} {
 		return nil
 	}
 
-	d := json.NewDecoder(base64.NewDecoder(b64, bytes.NewBuffer(b[lpm : n])))
+	d := json.NewDecoder(base64.NewDecoder(b64, bytes.NewBuffer(b[lpm:n])))
 
 	m := map[string]interface{}{}
 	err := d.Decode(&m)
-    if err != nil {
+	if err != nil {
 		println(err.Error())
-        return nil
-    }
+		return nil
+	}
 
 	return m
 }
 
 func Serialize(m map[string]interface{}) []byte {
-    b := &bytes.Buffer{}
+	b := &bytes.Buffer{}
 
 	inner := base64.NewEncoder(b64, b)
 	e := json.NewEncoder(inner)
 
-    err := e.Encode(m)
-    if err != nil {
-        return nil
+	err := e.Encode(m)
+	if err != nil {
+		return nil
 	}
 
 	// Needed to flush base64 encoded data to buffer.
 	inner.Close()
 
 	r := b.Bytes()
-    n := len(r)
+	n := len(r)
 
-    s := make([]byte, n + lpm + len(st))
+	s := make([]byte, n+lpm+len(st))
 
-    copy(s[:lpm], pm)
-    n += lpm
+	copy(s[:lpm], pm)
+	n += lpm
 
-    copy(s[lpm:n], r)
-    copy(s[n:], st)
+	copy(s[lpm:n], r)
+	copy(s[n:], st)
 
-    return s
+	return s
 }
 
 var (
 	b64 = base64.StdEncoding
 	lpm = len(pm)
 
-    // Control messages have the form: ESC^-{Base 64 encoded JSON}-ESC\.
-    pm = []byte{0x1b, '^', '-', '{'}  // ESC ^ (PM) then "-{".
-    st = []byte{'}', '-', 0x1b, '\\'} // "}-" then ESC \ (ST).
+	// Control messages have the form: ESC^-{Base 64 encoded JSON}-ESC\.
+	pm = []byte{0x1b, '^', '-', '{'}  // ESC ^ (PM) then "-{".
+	st = []byte{'}', '-', 0x1b, '\\'} // "}-" then ESC \ (ST).
 )

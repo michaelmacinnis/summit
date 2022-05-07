@@ -9,12 +9,12 @@ import (
 
 func (m *message) Args() []string {
 	var args []string
-    if a, ok := value(m.Parsed(), "run").([]interface{}); ok {
-        args = make([]string, len(a))
-        for k, v := range a {
-            args[k] = v.(string)
-        }
-    }
+	if a, ok := value(m.Parsed(), "run").([]interface{}); ok {
+		args = make([]string, len(a))
+		for k, v := range a {
+			args[k] = v.(string)
+		}
+	}
 
 	return args
 }
@@ -25,6 +25,10 @@ func (m *message) Command() string {
 
 func (m *message) Log() string {
 	return str(m.Parsed(), "log")
+}
+
+func (m *message) Mux() int {
+	return int(num(m.Parsed(), "mux"))
 }
 
 func (m *message) Pty() string {
@@ -40,53 +44,53 @@ func (m *message) Terminal() string {
 }
 
 func (m *message) WindowSize() *pty.Winsize {
-    ws := sub(m.Parsed(), "ws")
-    if ws == nil {
-        return nil
-    }
+	ws := sub(m.Parsed(), "ws")
+	if ws == nil {
+		return nil
+	}
 
-    return &pty.Winsize{
-        Rows: u16(ws, "Rows"),
-        Cols: u16(ws, "Cols"),
-        X:    u16(ws, "X"),
-        Y:    u16(ws, "Y"),
-    }
+	return &pty.Winsize{
+		Rows: u16(ws, "Rows"),
+		Cols: u16(ws, "Cols"),
+		X:    u16(ws, "X"),
+		Y:    u16(ws, "Y"),
+	}
 }
 
 func num(m map[string]interface{}, k string) float64 {
-    v := value(m, k)
-    if n, ok := v.(float64); ok {
-        return n
-    }
+	v := value(m, k)
+	if n, ok := v.(float64); ok {
+		return n
+	}
 
-    return 0
+	return 0
 }
 
 func str(m map[string]interface{}, k string) string {
-    if s, ok := value(m, k).(string); ok {
-        return s
-    }
+	if s, ok := value(m, k).(string); ok {
+		return s
+	}
 
-    return ""
+	return ""
 }
 
 func sub(m map[string]interface{}, k string) map[string]interface{} {
-    v := value(m, k)
-    if m, ok := v.(map[string]interface{}); ok {
-        return m
-    }
+	v := value(m, k)
+	if m, ok := v.(map[string]interface{}); ok {
+		return m
+	}
 
-    return nil
+	return nil
 }
 
 func u16(m map[string]interface{}, k string) uint16 {
-    return uint16(num(m, k))
+	return uint16(num(m, k))
 }
 
 func value(m map[string]interface{}, k string) interface{} {
-    if v, ok := m[k]; ok {
-        return v
-    }
+	if v, ok := m[k]; ok {
+		return v
+	}
 
-    return nil
+	return nil
 }

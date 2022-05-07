@@ -45,15 +45,15 @@ func Reader(r io.Reader, f func(b []byte)) {
 		b := make([]byte, blocksz)
 		n, _ := r.Read(b)
 
-/*
-		This may all end in tears...
+		/*
+			This may all end in tears...
 
-		if err != nil {
-			if !errors.Is(err, io.EOF) && !errors.Is(err, net.ErrClosed) {
-				println(fmt.Sprintf("%T", err), err.Error())
+			if err != nil {
+				if !errors.Is(err, io.EOF) && !errors.Is(err, net.ErrClosed) {
+					println(fmt.Sprintf("%T", err), err.Error())
+				}
 			}
-		}
-*/
+		*/
 
 		if n <= 0 {
 			break

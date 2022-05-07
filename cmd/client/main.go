@@ -10,8 +10,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/michaelmacinnis/summit/pkg/config"
 	"github.com/michaelmacinnis/summit/pkg/comms"
+	"github.com/michaelmacinnis/summit/pkg/config"
 	"github.com/michaelmacinnis/summit/pkg/errors"
 	"github.com/michaelmacinnis/summit/pkg/message"
 	"github.com/michaelmacinnis/summit/pkg/terminal"
@@ -49,7 +49,8 @@ func main() {
 	toServer := c
 	toTerminal := os.Stdout
 
-	cleanup := terminal.ForwardResize(func (b []byte){
+	cleanup := terminal.ForwardResize(func(b []byte) {
+		// TODO: These should go to from Terminal so that they aren't interleaved.
 		toServer.Write(b)
 	})
 	errors.AtExit(cleanup)

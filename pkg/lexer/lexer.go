@@ -154,7 +154,7 @@ func afterCloseBraceDashEscape(l *T) action {
 }
 
 func afterEscape(l *T) action {
-	//println("afterEscape")
+	// println("afterEscape")
 	return on(l, '^', afterEscapeCaret)
 }
 

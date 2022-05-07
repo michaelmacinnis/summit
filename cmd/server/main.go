@@ -19,36 +19,36 @@ import (
 )
 
 func Write(wc io.WriteCloser) chan [][]byte {
-    c := make(chan [][]byte)
+	c := make(chan [][]byte)
 
-    go func() {
-        defer wc.Close()
+	go func() {
+		defer wc.Close()
 
-        for bs := range c {
-            for _, b := range bs {
-                if b != nil {
+		for bs := range c {
+			for _, b := range bs {
+				if b != nil {
 					s := strconv.Quote(string(b))
 					if m := message.Deserialize(b); m != nil {
 						s = fmt.Sprintf("%v", m)
 					}
 					println("TO MUX:", s)
-                    _, err := wc.Write(b)
-                    if err != nil {
-                        println(err.Error())
-                    }
-                }
-            }
-        }
-    }()
+					_, err := wc.Write(b)
+					if err != nil {
+						println(err.Error())
+					}
+				}
+			}
+		}
+	}()
 
-    return c
+	return c
 }
 
 // TODO: allow overrides at the command line or with an environment variable.
 var (
 	client = config.Get("SUMMIT_CLIENT", "summit-client")
-	mux = config.Get("SUMMIT_MUX", "summit-mux")
-	term = config.Get("SUMMIT_TERMINAL", "kitty")
+	mux    = config.Get("SUMMIT_MUX", "summit-mux")
+	term   = config.Get("SUMMIT_TERMINAL", "kitty")
 )
 
 func launch(path string) (*exec.Cmd, chan *message.T, chan [][]byte) {
@@ -65,24 +65,24 @@ func launch(path string) (*exec.Cmd, chan *message.T, chan [][]byte) {
 	err = cmd.Start()
 	errors.On(err).Die("start error")
 
-	//return cmd, comms.Chunk(out), comms.Write(in)
+	// return cmd, comms.Chunk(out), comms.Write(in)
 	return cmd, comms.Chunk(out), Write(in)
 }
 
 func listen(accepted chan net.Conn) {
 	os.Remove(config.Socket())
 
-    l, err := net.Listen("unix", config.Socket())
-    errors.On(err).Die("listen error")
+	l, err := net.Listen("unix", config.Socket())
+	errors.On(err).Die("listen error")
 
-    defer l.Close()
+	defer l.Close()
 
-    for {
-        conn, err := l.Accept()
-        errors.On(err).Die("accept error")
+	for {
+		conn, err := l.Accept()
+		errors.On(err).Die("accept error")
 
 		accepted <- conn
-    }
+	}
 }
 
 func loop(accepted chan net.Conn, r chan *message.T, w chan [][]byte) {
@@ -148,7 +148,7 @@ func terminal(id string, conn net.Conn, ctl, r chan *message.T, w chan [][]byte)
 			// Clear program input buffer.
 			output = [][]byte{}
 		case m, ok := <-r:
-			if !ok {
+			if !ok || m == nil {
 				goto done
 			}
 
@@ -164,28 +164,14 @@ func terminal(id string, conn net.Conn, ctl, r chan *message.T, w chan [][]byte)
 				continue
 			}
 
-			send := false
 			if m.Command() == "run" {
 				go window(m, routing)
-			} else if m.Command() != "status" {
-				send = session.Track(routing)
-			} else {
-				var bs [][]byte
-				send, bs = session.Remove(routing)
-				if len(bs) > 0 {
-					w <- append(bs, m.Bytes())
-				}
-				if len(routing) > 1 {
-					routing = routing[:len(routing)-1]
-				}
-			}
-
-			if send {
+			} else if m.Command() != "mux" {
 				display <- [][]byte{m.Bytes()}
 			}
 
 			// Set header and clear routing.
-			header = session.Valid(routing)
+			header = routing
 			routing = [][]byte{}
 		}
 	}
@@ -206,14 +192,14 @@ func window(m *message.T, routing [][]byte) {
 
 	println("REQUEST:", fmt.Sprintf("%s %v", term, args))
 
-    cmd := exec.Command(term, args...)
+	cmd := exec.Command(term, args...)
 
-    cmd.Stderr = os.Stderr
+	cmd.Stderr = os.Stderr
 
-    err := cmd.Run()
-    if err != nil {
-        println(err.Error())
-    }
+	err := cmd.Run()
+	if err != nil {
+		println(err.Error())
+	}
 }
 
 func main() {
@@ -222,6 +208,7 @@ func main() {
 	flag.StringVar(&term, "t", term, "path to terminal emulator")
 	flag.Parse()
 
+	for {
 	cmd, r, w := launch(mux)
 
 	accepted := make(chan net.Conn)
@@ -230,7 +217,5 @@ func main() {
 	go loop(accepted, r, w)
 
 	cmd.Wait()
-
-	os.Exit(cmd.ProcessState.ExitCode())
+	}
 }
-

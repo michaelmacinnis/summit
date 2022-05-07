@@ -7,7 +7,7 @@ import (
 
 var (
 	command = Get("SUMMIT_COMMAND", Get("SHELL", "/bin/bash"))
-	socket = Get("SUMMIT_SOCKET", "/tmp/summit.socket")
+	socket  = Get("SUMMIT_SOCKET", "/tmp/summit.socket")
 )
 
 func Command() ([]string, bool) {

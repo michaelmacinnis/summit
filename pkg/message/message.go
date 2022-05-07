@@ -39,7 +39,7 @@ func (c *Class) String() string {
 type T struct {
 	cls Class
 	raw []byte
-	kv map[string]interface{}
+	kv  map[string]interface{}
 }
 
 type message = T
@@ -47,7 +47,7 @@ type message = T
 // KV creates a new message from a map.
 func KV(cls Class, kv map[string]interface{}) *message {
 	c := &message{
-		cls:  cls,
+		cls: cls,
 		kv:  kv,
 	}
 
@@ -61,8 +61,8 @@ func Log(format string, i ...interface{}) *message {
 // New creates a new message of unparsed bytes.
 func New(cls Class, raw []byte) *message {
 	c := &message{
-		cls:  cls,
-		raw:  raw,
+		cls: cls,
+		raw: raw,
 	}
 
 	return c

@@ -2,6 +2,10 @@
 
 package message
 
+func Mux(mux int) []byte {
+	return command("mux", mux)
+}
+
 func Pty(pty string) []byte {
 	return command("pty", pty)
 }
@@ -20,7 +24,7 @@ func Terminal(terminal string) []byte {
 
 func command(key string, value interface{}) []byte {
 	return Serialize(map[string]interface{}{
-        "cmd": key,
-        key: value,
-    })
+		"cmd": key,
+		key:   value,
+	})
 }
