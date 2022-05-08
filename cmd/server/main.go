@@ -166,8 +166,10 @@ func terminal(id string, conn net.Conn, ctl, r chan *message.T, w chan [][]byte)
 
 			if m.Command() == "run" {
 				go window(m, routing)
-			} else if m.Command() != "mux" {
-				display <- [][]byte{m.Bytes()}
+			} else {
+				if m.Command() != "mux" {
+					display <- [][]byte{m.Bytes()}
+				}
 			}
 
 			// Set header and clear routing.

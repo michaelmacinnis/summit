@@ -63,53 +63,6 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 	toProgram := comms.Write(f)
 
 	go func() {
-		buffered := make([][]byte, len(hdr))
-		copy(buffered, hdr)
-
-		sent := false
-
-		for m := range fromProgram {
-			if m.Is(message.Escape) {
-				if sent {
-					buffered = make([][]byte, len(hdr))
-					copy(buffered, hdr)
-					sent = false
-				}
-
-				n := int32(m.Mux())
-				if n != 0 {
-					atomic.AddInt32(&muxing, n)
-					out <- [][]byte{m.Bytes()}
-					continue
-				}
-
-				if m.Logging() {
-					out <- [][]byte{m.Bytes()}
-					continue
-				}
-
-				terminal := m.Terminal()
-				if terminal != "" {
-					buffered[0] = m.Bytes()
-				} else if m.Pty() != "" {
-					buffered = append(buffered, m.Bytes())
-				}
-
-				if m.Command() != "run" {
-					continue
-				}
-			}
-
-			// println("session: sending", m.String())
-
-			// println("mux:", len(buffered))
-
-			out <- append(buffered, m.Bytes())
-			sent = true
-		}
-	}()
-
-	go func() {
 		buffered := [][]byte{}
 		routing := 0
 
@@ -148,12 +101,52 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 		}
 	}()
 
+	buffered := make([][]byte, len(hdr))
+	copy(buffered, hdr)
+
+	sent := false
+
+	for m := range fromProgram {
+		if m.Is(message.Escape) {
+			if sent {
+				buffered = make([][]byte, len(hdr))
+				copy(buffered, hdr)
+				sent = false
+			}
+
+			if m.Logging() {
+				out <- [][]byte{m.Bytes()}
+				continue
+			}
+
+			terminal := m.Terminal()
+			if terminal != "" {
+				buffered[0] = m.Bytes()
+			} else if m.Pty() != "" {
+				buffered = append(buffered, m.Bytes())
+			} else if n := int32(m.Mux()); n != 0 {
+				atomic.AddInt32(&muxing, n)
+			}
+
+			if m.Command() != "run" && m.Command() != "mux" {
+				continue
+			}
+		}
+
+		// println("session: sending", m.String())
+
+		// println("mux:", len(buffered))
+
+		out <- append(buffered, m.Bytes())
+		sent = true
+	}
+
 	cmd.Wait()
 
 	code := cmd.ProcessState.ExitCode()
 	statusq <- Status{id, code}
 
-	out <- append(hdr, message.Status(code))
+	out <- append(hdr[:1], message.Status(code))
 }
 
 func main() {

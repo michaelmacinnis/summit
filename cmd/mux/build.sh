@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Figure out where we are.
-Dir="$(dirname -- "$(readlink -f -- "$0")")"
+Dir=$(dirname -- $(readlink -f -- "$0"))
 Build="${Dir}/../.."
 
 docker build -f - -t "mux:latest" "$Build" <<EOF
