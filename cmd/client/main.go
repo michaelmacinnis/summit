@@ -50,7 +50,7 @@ func main() {
 	toTerminal := os.Stdout
 
 	cleanup := terminal.ForwardResize(func(b []byte) {
-		// TODO: These should go to from Terminal so that they aren't interleaved.
+		// TODO: These should go to fromTerminal so that they aren't interleaved.
 		toServer.Write(b)
 	})
 	errors.AtExit(cleanup)

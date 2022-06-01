@@ -30,7 +30,7 @@ var (
 )
 
 func log(out chan [][]byte, format string, i ...interface{}) {
-	// out <- [][]byte{message.Log(label + ": " + format, i...).Bytes()}
+	out <- [][]byte{message.Log(label+": "+format, i...).Bytes()}
 }
 
 func session(id string, in chan *message.T, out chan [][]byte, statusq chan Status) {
@@ -101,45 +101,49 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 		}
 	}()
 
-	buffered := make([][]byte, len(hdr))
-	copy(buffered, hdr)
+	go func() {
+		buffered := make([][]byte, len(hdr))
+		copy(buffered, hdr)
 
-	sent := false
+		sent := false
 
-	for m := range fromProgram {
-		if m.Is(message.Escape) {
-			if sent {
-				buffered = make([][]byte, len(hdr))
-				copy(buffered, hdr)
-				sent = false
+		for m := range fromProgram {
+			if m.Is(message.Escape) {
+				if m.Logging() {
+					out <- [][]byte{m.Bytes()}
+					continue
+				}
+
+				if sent {
+					buffered = make([][]byte, len(hdr))
+					copy(buffered, hdr)
+					sent = false
+				}
+
+				terminal := m.Terminal()
+				if terminal != "" {
+					buffered[0] = m.Bytes()
+				} else if m.Pty() != "" {
+					buffered = append(buffered, m.Bytes())
+				} else if n := int32(m.Mux()); n != 0 {
+					atomic.AddInt32(&muxing, n)
+				}
+
+				if m.Command() != "run" && m.Command() != "mux" {
+					continue
+				}
 			}
 
-			if m.Logging() {
-				out <- [][]byte{m.Bytes()}
-				continue
-			}
+			// println("session: sending", m.String())
 
-			terminal := m.Terminal()
-			if terminal != "" {
-				buffered[0] = m.Bytes()
-			} else if m.Pty() != "" {
-				buffered = append(buffered, m.Bytes())
-			} else if n := int32(m.Mux()); n != 0 {
-				atomic.AddInt32(&muxing, n)
-			}
+			// println("mux:", len(buffered))
 
-			if m.Command() != "run" && m.Command() != "mux" {
-				continue
-			}
+			out <- append(buffered, m.Bytes())
+			sent = true
 		}
 
-		// println("session: sending", m.String())
-
-		// println("mux:", len(buffered))
-
-		out <- append(buffered, m.Bytes())
-		sent = true
-	}
+		log(out, "DONE!")
+	}()
 
 	cmd.Wait()
 
@@ -174,7 +178,7 @@ func main() {
 	toServer <- [][]byte{message.Mux(1)}
 	defer func() {
 		toServer <- [][]byte{message.Mux(-1)}
-		errors.Exit(status)
+		//errors.Exit(status)
 	}()
 
 	statusq := make(chan Status) // Pty ID + exit status.
@@ -271,7 +275,7 @@ func main() {
 			}
 
 			if len(stream) == 0 && atomic.LoadInt32(&muxing) == 0 {
-				return;
+				return
 			}
 		}
 	}

@@ -27,11 +27,14 @@ func Write(wc io.WriteCloser) chan [][]byte {
 		for bs := range c {
 			for _, b := range bs {
 				if b != nil {
+
+					// This block is just for debugging.
 					s := strconv.Quote(string(b))
 					if m := message.Deserialize(b); m != nil {
 						s = fmt.Sprintf("%v", m)
 					}
 					println("TO MUX:", s)
+
 					_, err := wc.Write(b)
 					if err != nil {
 						println(err.Error())
@@ -51,6 +54,43 @@ var (
 	term   = config.Get("SUMMIT_TERMINAL", "kitty")
 )
 
+func dispatch(accepted <-chan net.Conn, fromMux chan *message.T, toMux chan [][]byte) {
+	next := comms.Counter(1)
+
+	terminals := map[string]chan *message.T{}
+
+	var current chan *message.T
+
+	for {
+		select {
+		case conn := <-accepted:
+			id := <-next
+
+			// Override fromMux as messages from mux for this terminal.
+			fromMux := make(chan *message.T)
+			terminals[id] = fromMux
+
+			go terminal(id, conn, fromMux, toMux)
+
+		case m := <-fromMux:
+			if m.Is(message.Escape) {
+				if m.Logging() {
+					println("LOGGING:", m.Log())
+					continue
+				}
+
+				if id := m.Terminal(); id != "" {
+					current = terminals[id]
+				}
+			}
+
+			if current != nil {
+				current <- m
+			}
+		}
+	}
+}
+
 func launch(path string) (*exec.Cmd, chan *message.T, chan [][]byte) {
 	cmd := exec.Command(path)
 
@@ -65,7 +105,6 @@ func launch(path string) (*exec.Cmd, chan *message.T, chan [][]byte) {
 	err = cmd.Start()
 	errors.On(err).Die("start error")
 
-	// return cmd, comms.Chunk(out), comms.Write(in)
 	return cmd, comms.Chunk(out), Write(in)
 }
 
@@ -85,46 +124,11 @@ func listen(accepted chan net.Conn) {
 	}
 }
 
-func loop(accepted chan net.Conn, r chan *message.T, w chan [][]byte) {
-	next := comms.Counter(1)
-
-	terminals := map[string]chan *message.T{}
-
-	var current chan *message.T
-
-	for {
-		select {
-		case conn := <-accepted:
-			id := <-next
-			ch := make(chan *message.T)
-			terminals[id] = ch
-
-			go terminal(id, conn, r, ch, w)
-
-		case m := <-r:
-			if m.Is(message.Escape) {
-				if m.Logging() {
-					println("LOGGING:", m.Log())
-					continue
-				}
-
-				if id := m.Terminal(); id != "" {
-					current = terminals[id]
-				}
-			}
-
-			if current != nil {
-				current <- m
-			}
-		}
-	}
-}
-
-func terminal(id string, conn net.Conn, ctl, r chan *message.T, w chan [][]byte) {
+func terminal(id string, conn net.Conn, fromMux <-chan *message.T, toMux chan [][]byte) {
 	defer conn.Close()
 
-	display := comms.Write(conn)
-	keyboard := comms.Chunk(conn)
+	fromClient := comms.Chunk(conn)
+	toClient := comms.Write(conn)
 
 	output := [][]byte{}
 	routing := [][]byte{}
@@ -133,7 +137,7 @@ func terminal(id string, conn net.Conn, ctl, r chan *message.T, w chan [][]byte)
 
 	for {
 		select {
-		case m, ok := <-keyboard:
+		case m, ok := <-fromClient:
 			if !ok {
 				goto done
 			}
@@ -143,11 +147,13 @@ func terminal(id string, conn net.Conn, ctl, r chan *message.T, w chan [][]byte)
 				continue
 			}
 
-			w <- append(append(header, output...), m.Bytes())
+			toMux <- append(append(header, output...), m.Bytes())
 
 			// Clear program input buffer.
 			output = [][]byte{}
-		case m, ok := <-r:
+
+		// From mux (after being demultiplexed by the dispatcher).
+		case m, ok := <-fromMux:
 			if !ok || m == nil {
 				goto done
 			}
@@ -168,7 +174,7 @@ func terminal(id string, conn net.Conn, ctl, r chan *message.T, w chan [][]byte)
 				go window(m, routing)
 			} else {
 				if m.Command() != "mux" {
-					display <- [][]byte{m.Bytes()}
+					toClient <- [][]byte{m.Bytes()}
 				}
 			}
 
@@ -210,14 +216,16 @@ func main() {
 	flag.StringVar(&term, "t", term, "path to terminal emulator")
 	flag.Parse()
 
-	for {
-	cmd, r, w := launch(mux)
-
 	accepted := make(chan net.Conn)
+
+	// Listen for connections and send them to accepted.
 	go listen(accepted)
 
-	go loop(accepted, r, w)
+	for {
+		cmd, fromMux, toMux := launch(mux)
 
-	cmd.Wait()
+		go dispatch(accepted, fromMux, toMux)
+
+		cmd.Wait()
 	}
 }
