@@ -179,9 +179,7 @@ func main() {
 	defer func() {
 		toServer <- [][]byte{message.Mux(-1)}
 
-		// NOTE: This exit, I believe, causes the process to exit before
-		// other messages are flushed. Will need another way to do this.
-		// errors.Exit(status)
+		errors.Exit(status)
 	}()
 
 	statusq := make(chan Status) // Pty ID + exit status.

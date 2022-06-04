@@ -10,12 +10,12 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 
 	"github.com/michaelmacinnis/summit/pkg/comms"
 	"github.com/michaelmacinnis/summit/pkg/config"
 	"github.com/michaelmacinnis/summit/pkg/errors"
 	"github.com/michaelmacinnis/summit/pkg/message"
-	"github.com/michaelmacinnis/summit/pkg/session"
 )
 
 func Write(wc io.WriteCloser) chan [][]byte {
@@ -53,6 +53,31 @@ var (
 	mux    = config.Get("SUMMIT_MUX", "summit-mux")
 	term   = config.Get("SUMMIT_TERMINAL", "kitty")
 )
+
+func address(offset int, bs [][]byte) (string, string) {
+	path := make([]string, len(bs))
+	n := 0
+
+	term := ""
+	for _, b := range bs {
+		p := message.New(message.Escape, b)
+		switch p.Command() {
+		case "pty":
+			path[n] = p.Pty()
+			n++
+
+		case "term":
+			term = p.Terminal()
+		}
+	}
+
+	n += offset
+	if n > 0 {
+		return term, strings.Join(path[:n], "-")
+	}
+
+	return term, ""
+}
 
 func dispatch(accepted <-chan net.Conn, fromMux chan *message.T, toMux chan [][]byte) {
 	next := comms.Counter(1)
@@ -200,7 +225,7 @@ done:
 func window(m *message.T, routing [][]byte) {
 	args := []string{client}
 
-	_, path := session.Path(-1, routing)
+	_, path := address(-1, routing)
 	if path != "" {
 		args = append(args, "-p", path)
 	}
