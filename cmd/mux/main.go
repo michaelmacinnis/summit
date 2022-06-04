@@ -36,9 +36,11 @@ func log(out chan [][]byte, format string, i ...interface{}) {
 func session(id string, in chan *message.T, out chan [][]byte, statusq chan Status) {
 	log(out, "launching %s", id)
 
+	// Find out what terminal this session is connected to.
 	m := <-in
 	hdr := [][]byte{m.Bytes(), message.Pty(id)}
 
+	// Find out what command we're running.
 	m = <-in
 	args := m.Args()
 
@@ -114,6 +116,9 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 					continue
 				}
 
+                // This block is just for debugging.
+				log(out, "Message received: %s", fmt.Sprintf("%v", m))
+
 				if sent {
 					buffered = make([][]byte, len(hdr))
 					copy(buffered, hdr)
@@ -129,7 +134,7 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 					atomic.AddInt32(&muxing, n)
 				}
 
-				if m.Command() != "run" && m.Command() != "mux" {
+				if m.Command() != "run" && m.Command() != "mux" && m.Command() != "status" {
 					continue
 				}
 			}
@@ -148,9 +153,11 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 	cmd.Wait()
 
 	code := cmd.ProcessState.ExitCode()
-	statusq <- Status{id, code}
+	log(out, "Status: %d", code)
 
 	out <- append(hdr[:1], message.Status(code))
+
+	statusq <- Status{id, code}
 }
 
 func main() {
@@ -178,6 +185,9 @@ func main() {
 	toServer <- [][]byte{message.Mux(1)}
 	defer func() {
 		toServer <- [][]byte{message.Mux(-1)}
+
+		// NOTE: This exit, I believe, causes the process to exit before
+		// other messages are flushed. Will need another way to do this.
 		//errors.Exit(status)
 	}()
 

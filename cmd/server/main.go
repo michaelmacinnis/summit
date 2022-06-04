@@ -60,11 +60,14 @@ func dispatch(accepted <-chan net.Conn, fromMux chan *message.T, toMux chan [][]
 	terminals := map[string]chan *message.T{}
 
 	var current chan *message.T
+	var id string
 
 	for {
 		select {
 		case conn := <-accepted:
-			id := <-next
+			println("New terminal.")
+
+			id = <-next
 
 			// Override fromMux as messages from mux for this terminal.
 			fromMux := make(chan *message.T)
@@ -79,14 +82,31 @@ func dispatch(accepted <-chan net.Conn, fromMux chan *message.T, toMux chan [][]
 					continue
 				}
 
-				if id := m.Terminal(); id != "" {
+				if m.Command() == "mux" {
+					continue
+				}
+
+				if n := m.Terminal(); n != "" {
+					id = n
 					current = terminals[id]
 				}
+
+				println("Message:", m.String())
 			}
+
+			println("Sending to terminal.")
 
 			if current != nil {
 				current <- m
 			}
+
+			if m.Command() == "status" {
+				close(current)
+				current = nil
+				terminals[id] = nil
+			}
+
+			println("Done sending to terminal.")
 		}
 	}
 }
@@ -119,6 +139,8 @@ func listen(accepted chan net.Conn) {
 	for {
 		conn, err := l.Accept()
 		errors.On(err).Die("accept error")
+
+		println("Got connection.")
 
 		accepted <- conn
 	}
@@ -155,6 +177,7 @@ func terminal(id string, conn net.Conn, fromMux <-chan *message.T, toMux chan []
 		// From mux (after being demultiplexed by the dispatcher).
 		case m, ok := <-fromMux:
 			if !ok || m == nil {
+				println("Channel closed or nil message.")
 				goto done
 			}
 
