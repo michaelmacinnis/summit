@@ -17,6 +17,7 @@ func Counter(initial uint64) chan string {
 
 	go func() {
 		i := initial
+
 		for {
 			next <- strconv.FormatUint(i, 10)
 			i++

@@ -16,8 +16,6 @@ import (
 
 // T holds the state of the scanner.
 type T struct {
-	expected []string // Completion candidates.
-
 	bytes []byte   // Buffer being scanned.
 	first int      // Index of the current message's first byte.
 	index int      // Index of the current byte.
@@ -103,13 +101,6 @@ func (l *T) gather() {
 	l.index -= l.first
 	l.first = 0
 	l.messages = make(chan *message.T, qsize)
-}
-
-func (l *T) next() rune {
-	r, w := l.peek()
-	l.accept(r, w)
-
-	return r
 }
 
 func (l *T) peek() (rune, int) {

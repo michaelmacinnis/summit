@@ -24,7 +24,7 @@ func ForwardResize(f func(b []byte)) func() error {
 		for range signals {
 			ws, err := pty.GetsizeFull(fd)
 			if err != nil {
-				fmt.Printf("error getting window size: %s\n", err.Error)
+				fmt.Printf("error getting window size: %s\n", err.Error())
 				continue
 			}
 

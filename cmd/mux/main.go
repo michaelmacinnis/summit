@@ -10,7 +10,6 @@ import (
 	"sync/atomic"
 
 	"github.com/creack/pty"
-
 	"github.com/michaelmacinnis/summit/pkg/comms"
 	"github.com/michaelmacinnis/summit/pkg/config"
 	"github.com/michaelmacinnis/summit/pkg/errors"
@@ -19,23 +18,24 @@ import (
 )
 
 type Status struct {
-	pty string
-	rv int
+	pty  string
+	rv   int
 	term string
 }
 
+//nolint:gochecknoglobals
 var (
 	label  = "unknown"
 	muxing = int32(0)
 	status = 0
 )
 
-func log(out chan [][]byte, format string, i ...interface{}) {
+func logf(out chan [][]byte, format string, i ...interface{}) {
 	out <- [][]byte{message.Log(label+": "+format, i...).Bytes()}
 }
 
 func session(id string, in chan *message.T, out chan [][]byte, statusq chan Status) {
-	log(out, "launching %s", id)
+	logf(out, "launching %s", id)
 
 	// Find out what terminal this session is connected to.
 	m := <-in
@@ -46,7 +46,8 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 	m = <-in
 	args := m.Args()
 
-	cmd := exec.Command(args[0], args[1:]...)
+	cmd := exec.Command(args[0], args[1:]...) //nolint:gosec
+
 	f, err := pty.Start(cmd)
 	if err != nil {
 		println(err.Error())
@@ -69,8 +70,6 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 		routing := 0
 
 		for m := range in {
-			// println("session: received", m.String())
-
 			if m.Is(message.Escape) {
 				if m.Command() != "run" {
 					buffered = append(buffered, m.Bytes())
@@ -104,8 +103,7 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 	}()
 
 	go func() {
-		buffered := make([][]byte, len(hdr))
-		copy(buffered, hdr)
+		buffered := append([][]byte{}, hdr...)
 
 		sent := false
 
@@ -113,12 +111,14 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 			if m.Is(message.Escape) {
 				if m.Logging() {
 					out <- [][]byte{m.Bytes()}
+
 					continue
 				}
 
 				if sent {
 					buffered = make([][]byte, len(hdr))
 					copy(buffered, hdr)
+
 					sent = false
 				}
 
@@ -141,11 +141,15 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 			// println("mux:", len(buffered))
 
 			out <- append(buffered, m.Bytes())
+
 			sent = true
 		}
 	}()
 
-	cmd.Wait()
+	err = cmd.Wait()
+	if err != nil {
+		println("error waiting for command: %s", err.Error())
+	}
 
 	code := cmd.ProcessState.ExitCode()
 
@@ -219,13 +223,14 @@ func main() {
 			}
 
 			if m.Is(message.Escape) {
-				log(toServer, "mux received: %v", m.Parsed())
+				logf(toServer, "mux received: %v", m.Parsed())
 
 				switch m.Command() {
 				case "pty":
 					if selected == nil {
 						id = m.Pty()
 						selected = stream[id]
+
 						continue
 					}
 
@@ -243,7 +248,7 @@ func main() {
 						stream[id] = selected
 
 						for _, v := range buffered {
-							log(toServer, "buffered: %v", v.Parsed())
+							logf(toServer, "buffered: %v", v.Parsed())
 						}
 
 						go session(id, selected, toServer, statusq)
