@@ -19,8 +19,9 @@ import (
 )
 
 type Status struct {
-	id string
+	pty string
 	rv int
+	term string
 }
 
 var (
@@ -38,6 +39,7 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 
 	// Find out what terminal this session is connected to.
 	m := <-in
+	term := m.Terminal()
 	hdr := [][]byte{m.Bytes(), message.Pty(id)}
 
 	// Find out what command we're running.
@@ -50,9 +52,7 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 		println(err.Error())
 
 		code := cmd.ProcessState.ExitCode()
-		statusq <- Status{id, code}
-
-		out <- append(hdr[:1], message.Status(code))
+		statusq <- Status{id, code, term}
 	}
 
 	defer func() {
@@ -116,9 +116,6 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 					continue
 				}
 
-                // This block is just for debugging.
-				log(out, "Message received: %s", fmt.Sprintf("%v", m))
-
 				if sent {
 					buffered = make([][]byte, len(hdr))
 					copy(buffered, hdr)
@@ -134,7 +131,7 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 					atomic.AddInt32(&muxing, n)
 				}
 
-				if m.Command() != "run" && m.Command() != "mux" && m.Command() != "status" {
+				if m.Command() != "mux" && m.Command() != "run" && m.Command() != "status" {
 					continue
 				}
 			}
@@ -146,18 +143,13 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 			out <- append(buffered, m.Bytes())
 			sent = true
 		}
-
-		log(out, "DONE!")
 	}()
 
 	cmd.Wait()
 
 	code := cmd.ProcessState.ExitCode()
-	log(out, "Status: %d", code)
 
-	out <- append(hdr[:1], message.Status(code))
-
-	statusq <- Status{id, code}
+	statusq <- Status{id, code, term}
 }
 
 func main() {
@@ -176,6 +168,7 @@ func main() {
 	}
 
 	stream := map[string]chan *message.T{}
+	term := ""
 
 	next := comms.Counter(1)
 
@@ -188,7 +181,7 @@ func main() {
 
 		// NOTE: This exit, I believe, causes the process to exit before
 		// other messages are flushed. Will need another way to do this.
-		//errors.Exit(status)
+		// errors.Exit(status)
 	}()
 
 	statusq := make(chan Status) // Pty ID + exit status.
@@ -277,14 +270,27 @@ func main() {
 			selected = nil
 
 		case s := <-statusq:
-			close(stream[s.id])
-			delete(stream, s.id)
+			close(stream[s.pty])
+			delete(stream, s.pty)
 
-			if s.id == "0" {
+			if s.pty == "0" {
 				status = s.rv
+				term = s.term
+			}
+
+			toServer <- [][]byte{
+				message.Terminal(s.term),
+				message.Status(s.rv),
 			}
 
 			if len(stream) == 0 && atomic.LoadInt32(&muxing) == 0 {
+				if term != "" {
+					toServer <- [][]byte{
+						message.Terminal(term),
+						message.Status(status),
+					}
+				}
+
 				return
 			}
 		}

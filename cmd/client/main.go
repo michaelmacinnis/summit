@@ -20,6 +20,8 @@ import (
 func main() {
 	defer errors.Exit(0)
 
+	muxing := int32(0)
+
 	path := ""
 	flag.StringVar(&path, "p", path, "routing path")
 	flag.Parse()
@@ -75,7 +77,9 @@ func main() {
 		}
 
 		if m.Is(message.Escape) {
-			if m.Command() == "status" {
+			if n := int32(m.Mux()); n != 0 {
+				muxing += n
+			} else if muxing == 0 && m.Command() == "status" {
 				errors.Exit(m.Status())
 			}
 

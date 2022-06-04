@@ -69,20 +69,19 @@ func dispatch(accepted <-chan net.Conn, fromMux chan *message.T, toMux chan [][]
 
 			id = <-next
 
-			// Override fromMux as messages from mux for this terminal.
-			fromMux := make(chan *message.T)
-			terminals[id] = fromMux
+			fromDispatch := make(chan *message.T)
+			terminals[id] = fromDispatch
 
-			go terminal(id, conn, fromMux, toMux)
+			go terminal(id, conn, fromDispatch, toMux)
 
-		case m := <-fromMux:
+		case m, ok := <-fromMux:
+			if !ok {
+				return
+			}
+
 			if m.Is(message.Escape) {
 				if m.Logging() {
 					println("LOGGING:", m.Log())
-					continue
-				}
-
-				if m.Command() == "mux" {
 					continue
 				}
 
@@ -90,23 +89,11 @@ func dispatch(accepted <-chan net.Conn, fromMux chan *message.T, toMux chan [][]
 					id = n
 					current = terminals[id]
 				}
-
-				println("Message:", m.String())
 			}
-
-			println("Sending to terminal.")
 
 			if current != nil {
 				current <- m
 			}
-
-			if m.Command() == "status" {
-				close(current)
-				current = nil
-				terminals[id] = nil
-			}
-
-			println("Done sending to terminal.")
 		}
 	}
 }
@@ -196,9 +183,7 @@ func terminal(id string, conn net.Conn, fromMux <-chan *message.T, toMux chan []
 			if m.Command() == "run" {
 				go window(m, routing)
 			} else {
-				if m.Command() != "mux" {
-					toClient <- [][]byte{m.Bytes()}
-				}
+				toClient <- [][]byte{m.Bytes()}
 			}
 
 			// Set header and clear routing.
