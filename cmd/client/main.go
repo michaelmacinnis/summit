@@ -22,8 +22,8 @@ func main() {
 
 	muxing := int32(0)
 
-	path := ""
-	flag.StringVar(&path, "p", path, "routing path")
+	j := flag.String("e", "", "environment (as a JSON array)")
+	path := flag.String("p", "", "routing path")
 	flag.Parse()
 
 	restore, err := terminal.MakeRaw()
@@ -36,14 +36,14 @@ func main() {
 
 	errors.AtExit(c.Close)
 
-	for _, s := range strings.Split(path, "-") {
+	for _, s := range strings.Split(*path, "-") {
 		if s != "" {
 			c.Write(message.Pty(s))
 		}
 	}
 
 	args, _ := config.Command()
-	c.Write(message.Run(args))
+	c.Write(message.Run(args, config.Env(*j)))
 
 	fromServer := comms.Chunk(c)
 	fromTerminal := comms.Chunk(os.Stdin)

@@ -4,8 +4,6 @@
 package message
 
 import (
-	"strings"
-
 	"github.com/creack/pty"
 )
 
@@ -25,16 +23,13 @@ func (m *message) Command() string {
 	return str(m.Parsed(), "cmd")
 }
 
-func (m *message) Env() (dir string, env []string) {
+func (m *message) Env() (env []string) {
 	if a, ok := value(m.Parsed(), "env").([]interface{}); ok {
 		env = make([]string, len(a))
+
 		for k, v := range a {
 			s := v.(string)
 			env[k] = s
-
-			if strings.HasPrefix(s, "PWD=") {
-				dir = strings.TrimPrefix(s, "PWD=")
-			}
 		}
 	}
 

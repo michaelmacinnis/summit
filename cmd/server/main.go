@@ -3,6 +3,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -229,19 +230,23 @@ func window(m *message.T, routing [][]byte) {
 	if path != "" {
 		args = append(args, "-p", path)
 	}
+
+	j, err := json.Marshal(m.Env())
+	if err != nil {
+		println(err.Error())
+	} else {
+		args = append(args, "-e", string(j))
+	}
+
 	args = append(args, m.Args()...)
 
 	println("REQUEST:", fmt.Sprintf("%s %v", term, args))
 
 	cmd := exec.Command(term, args...)
 
-	// TODO: This doesn't work when the request isn't local
-	// We will need to pass these as arguments to the client.
-	cmd.Dir, cmd.Env = m.Env()
-
 	cmd.Stderr = os.Stderr
 
-	err := cmd.Run()
+	err = cmd.Run()
 	if err != nil {
 		println(err.Error())
 	}

@@ -2,8 +2,6 @@
 
 package message
 
-import "os"
-
 func Mux(mux int) []byte {
 	return command("mux", mux)
 }
@@ -12,11 +10,11 @@ func Pty(pty string) []byte {
 	return command("pty", pty)
 }
 
-func Run(cmd []string) []byte {
+func Run(cmd []string, env []string) []byte {
 	return Serialize(map[string]interface{}{
 		"cmd": "run",
 		"run": cmd,
-		"env": os.Environ(),
+		"env": env,
 	})
 }
 

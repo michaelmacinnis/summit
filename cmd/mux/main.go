@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"sync/atomic"
 
 	"github.com/creack/pty"
@@ -48,7 +49,8 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 
 	cmd := exec.Command(args[0], args[1:]...) //nolint:gosec
 
-	cmd.Dir, cmd.Env = m.Env()
+	cmd.Env = m.Env()
+	cmd.Dir = wd(cmd.Env)
 
 	logf(out, "environment: %#v", cmd.Env)
 
@@ -161,6 +163,16 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 	statusq <- Status{id, code, term}
 }
 
+func wd(env []string) string {
+	for _, s := range env {
+		if strings.HasPrefix(s, "PWD=") {
+			return strings.TrimPrefix(s, "PWD=")
+		}
+	}
+
+	return ""
+}
+
 func main() {
 	request := false
 
@@ -172,7 +184,7 @@ func main() {
 	// println("args", explicit, fmt.Sprintf("%v", args))
 
 	if request {
-		os.Stdout.Write(message.Run(args))
+		os.Stdout.Write(message.Run(args, os.Environ()))
 		return
 	}
 
@@ -208,7 +220,7 @@ func main() {
 
 		go session(id, c, toServer, statusq)
 		c <- message.New(message.Escape, message.Terminal(""))
-		c <- message.New(message.Escape, message.Run(args))
+		c <- message.New(message.Escape, message.Run(args, os.Environ()))
 
 		cleanup := terminal.ForwardResize(func(b []byte) {
 			c <- message.New(message.Escape, b)

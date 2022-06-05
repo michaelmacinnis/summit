@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"flag"
 	"os"
 )
@@ -17,6 +18,21 @@ func Command() ([]string, bool) {
 	}
 
 	return []string{command}, false
+}
+
+func Env(j string) []string {
+	env := []string{}
+
+	if j != "" {
+		err := json.Unmarshal([]byte(j), &env)
+		if err != nil {
+			env = os.Environ()
+		}
+	} else {
+		env = os.Environ()
+	}
+
+	return env
 }
 
 func Get(k, dflt string) string {
