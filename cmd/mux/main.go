@@ -70,6 +70,8 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 		routing := 0
 
 		for m := range in {
+			var ws *pty.Winsize
+
 			if m.Is(message.Escape) {
 				if m.Command() != "run" {
 					buffered = append(buffered, m.Bytes())
@@ -79,21 +81,20 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 					routing++
 				}
 
-				ws := m.WindowSize()
+				ws = m.WindowSize()
 				if ws != nil {
 					if err := pty.Setsize(f, ws); err != nil {
 						println("error setting window size:", err.Error())
 					}
-				}
-
-				if m.Command() != "run" {
+				} else if m.Command() != "run" {
 					continue
 				}
 			}
 
 			if routing > 0 || m.Command() == "run" {
 				toProgram <- append(buffered, m.Bytes())
-			} else {
+			} else if ws == nil {
+				// Don't send window size.
 				toProgram <- [][]byte{m.Bytes()}
 			}
 
