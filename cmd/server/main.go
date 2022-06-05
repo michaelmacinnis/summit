@@ -235,6 +235,10 @@ func window(m *message.T, routing [][]byte) {
 
 	cmd := exec.Command(term, args...)
 
+	// TODO: This doesn't work when the request isn't local
+	// We will need to pass these as arguments to the client.
+	cmd.Dir, cmd.Env = m.Env()
+
 	cmd.Stderr = os.Stderr
 
 	err := cmd.Run()

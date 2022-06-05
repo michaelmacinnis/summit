@@ -48,6 +48,10 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 
 	cmd := exec.Command(args[0], args[1:]...) //nolint:gosec
 
+	cmd.Dir, cmd.Env = m.Env()
+
+	logf(out, "environment: %#v", cmd.Env)
+
 	f, err := pty.Start(cmd)
 	if err != nil {
 		println(err.Error())
