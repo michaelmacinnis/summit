@@ -71,41 +71,46 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 	fromProgram := comms.Chunk(f)
 	toProgram := comms.Write(f)
 
+	bytes  := []byte{}
+	nested := int32(0)
+
 	go func() {
 		buffered := [][]byte{}
-		routing := 0
 
 		for m := range in {
 			var ws *pty.Winsize
 
 			if m.Is(message.Escape) {
-				if m.Command() != "run" {
-					buffered = append(buffered, m.Bytes())
-				}
-
-				if m.Command() == "pty" {
-					routing++
-				}
-
 				ws = m.WindowSize()
 				if ws != nil {
 					if err := pty.Setsize(f, ws); err != nil {
 						println("error setting window size:", err.Error())
 					}
-				} else if m.Command() != "run" {
+
+					// TODO: Mutex around nested and bytes instead of
+					//       nested being atomic.
+					bytes = m.Bytes()
+					if atomic.LoadInt32(&nested) > 0 {
+						toProgram <- [][]byte{bytes}
+					}
+
+					continue
+				}
+
+				if m.Command() != "run" {
+					buffered = append(buffered, m.Bytes())
 					continue
 				}
 			}
 
-			if routing > 0 || m.Command() == "run" {
+			if atomic.LoadInt32(&nested) > 0 {
 				toProgram <- append(buffered, m.Bytes())
-			} else if ws == nil {
-				// Don't send window size.
+			} else {
 				toProgram <- [][]byte{m.Bytes()}
 			}
 
+
 			buffered = [][]byte{}
-			routing = 0
 		}
 	}()
 
@@ -136,6 +141,11 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 					buffered = append(buffered, m.Bytes())
 				} else if n := int32(m.Mux()); n != 0 {
 					atomic.AddInt32(&muxing, n)
+					atomic.AddInt32(&nested, n)
+
+					if n > 0 {
+						toProgram <- [][]byte{bytes}
+					}
 				}
 
 				if m.Command() != "mux" && m.Command() != "run" && m.Command() != "status" {
@@ -221,11 +231,6 @@ func main() {
 		go session(id, c, toServer, statusq)
 		c <- message.New(message.Escape, message.Terminal(""))
 		c <- message.New(message.Escape, message.Run(args, os.Environ()))
-
-		cleanup := terminal.ForwardResize(func(b []byte) {
-			c <- message.New(message.Escape, b)
-		})
-		errors.AtExit(cleanup)
 	}
 
 	buffered := []*message.T{}

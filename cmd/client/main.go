@@ -51,11 +51,12 @@ func main() {
 	toServer := c
 	toTerminal := os.Stdout
 
-	cleanup := terminal.ForwardResize(func(b []byte) {
-		// TODO: These should go to fromTerminal so that they aren't interleaved.
-		toServer.Write(b)
+	cleanup := terminal.ForwardResize(func(m *message.T) {
+		fromTerminal <- m
 	})
 	errors.AtExit(cleanup)
+
+	go terminal.Sigwinch()
 
 	newline := false
 	for {
@@ -83,7 +84,9 @@ func main() {
 				errors.Exit(m.Status())
 			}
 
-			continue
+			if m.Command() != "set-window-size" {
+				continue
+			}
 		}
 
 		s := m.Bytes()

@@ -14,10 +14,12 @@ import (
 	"github.com/michaelmacinnis/summit/pkg/message"
 )
 
-func ForwardResize(f func(b []byte)) func() error {
+var signals chan os.Signal
+
+func ForwardResize(f func(m *message.T)) func() error {
 	fd := os.Stdin
 
-	signals := make(chan os.Signal, 1)
+	signals = make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGWINCH)
 
 	go func() {
@@ -28,14 +30,12 @@ func ForwardResize(f func(b []byte)) func() error {
 				continue
 			}
 
-			f(message.Serialize(map[string]interface{}{
+			f(message.KV(map[string]interface{}{
 				"cmd": "set-window-size",
 				"ws":  &ws,
 			}))
 		}
 	}()
-
-	signals <- syscall.SIGWINCH
 
 	return func() error {
 		signal.Stop(signals)
@@ -43,6 +43,10 @@ func ForwardResize(f func(b []byte)) func() error {
 
 		return nil
 	}
+}
+
+func IsTTY() bool {
+	return term.IsTerminal(int(os.Stdin.Fd()))
 }
 
 func MakeRaw() (func() error, error) {
@@ -55,6 +59,6 @@ func MakeRaw() (func() error, error) {
 	}, err
 }
 
-func IsTTY() bool {
-	return term.IsTerminal(int(os.Stdin.Fd()))
+func Sigwinch() {
+	signals <- syscall.SIGWINCH
 }

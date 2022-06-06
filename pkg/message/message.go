@@ -45,9 +45,9 @@ type T struct {
 type message = T
 
 // KV creates a new message from a map.
-func KV(cls Class, kv map[string]interface{}) *message {
+func KV(kv map[string]interface{}) *message {
 	c := &message{
-		cls: cls,
+		cls: Escape,
 		kv:  kv,
 	}
 
