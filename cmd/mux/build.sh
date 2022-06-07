@@ -15,11 +15,10 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s"
 
 FROM ubuntu:latest
 
-# TODO: Actually install packages.
+RUN apt-get update && apt-get install -y vim
 
 WORKDIR /build/summit/cmd/mux
 COPY --from=builder /build/summit/cmd/mux/mux .
 
-ENTRYPOINT ["/build/summit/cmd/mux/mux"]
-CMD ["/bin/bash"]
+CMD ["/build/summit/cmd/mux/mux", "-l", "docker", "/bin/bash"]
 EOF

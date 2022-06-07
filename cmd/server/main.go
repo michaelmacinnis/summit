@@ -10,7 +10,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"strconv"
+//	"strconv"
 	"strings"
 
 	"github.com/michaelmacinnis/summit/pkg/comms"
@@ -29,12 +29,14 @@ func Write(wc io.WriteCloser) chan [][]byte {
 			for _, b := range bs {
 				if b != nil {
 
+/*
 					// This block is just for debugging.
 					s := strconv.Quote(string(b))
 					if m := message.Deserialize(b); m != nil {
 						s = fmt.Sprintf("%v", m)
 					}
 					println("TO MUX:", s)
+*/
 
 					_, err := wc.Write(b)
 					if err != nil {
@@ -125,7 +127,7 @@ func dispatch(accepted <-chan net.Conn, fromMux chan *message.T, toMux chan [][]
 }
 
 func launch(path string) (*exec.Cmd, chan *message.T, chan [][]byte) {
-	cmd := exec.Command(path)
+	cmd := exec.Command(path, "-l", "main")
 
 	in, err := cmd.StdinPipe()
 	errors.On(err).Die("stdin error")
@@ -194,12 +196,14 @@ func terminal(id string, conn net.Conn, fromMux <-chan *message.T, toMux chan []
 				goto done
 			}
 
+/*
 			s := strconv.Quote(string(m.Bytes()))
 			if m.Is(message.Escape) {
 				s = fmt.Sprintf("%v", m.Parsed())
 			}
 
 			println("FROM MUX:", s)
+*/
 
 			if m.Routing() {
 				routing = append(routing, m.Bytes())

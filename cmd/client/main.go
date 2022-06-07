@@ -56,9 +56,9 @@ func main() {
 	})
 	errors.AtExit(cleanup)
 
-	go terminal.Sigwinch()
-
 	newline := false
+	sentsize := false
+
 	for {
 		var f io.Writer
 		var m *message.T
@@ -67,6 +67,12 @@ func main() {
 		case m = <-fromTerminal:
 			f = toServer
 		case m = <-fromServer:
+			if !sentsize {
+				go terminal.Sigwinch()
+
+				sentsize = true
+			}
+
 			f = toTerminal
 		}
 
@@ -80,6 +86,7 @@ func main() {
 		if m.Is(message.Escape) {
 			if n := int32(m.Mux()); n != 0 {
 				muxing += n
+				sentsize = false
 			} else if muxing == 0 && m.Command() == "status" {
 				errors.Exit(m.Status())
 			}

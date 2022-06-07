@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync/atomic"
 
@@ -52,7 +53,7 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 	cmd.Env = m.Env()
 	cmd.Dir = wd(cmd.Env)
 
-	logf(out, "environment: %#v", cmd.Env)
+	//logf(out, "environment: %#v", cmd.Env)
 
 	f, err := pty.Start(cmd)
 	if err != nil {
@@ -71,7 +72,6 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 	fromProgram := comms.Chunk(f)
 	toProgram := comms.Write(f)
 
-	bytes  := []byte{}
 	nested := int32(0)
 
 	go func() {
@@ -86,18 +86,7 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 					if err := pty.Setsize(f, ws); err != nil {
 						println("error setting window size:", err.Error())
 					}
-
-					// TODO: Mutex around nested and bytes instead of
-					//       nested being atomic.
-					bytes = m.Bytes()
-					if atomic.LoadInt32(&nested) > 0 {
-						toProgram <- [][]byte{bytes}
-					}
-
-					continue
-				}
-
-				if m.Command() != "run" {
+				} else if m.Command() != "run" {
 					buffered = append(buffered, m.Bytes())
 					continue
 				}
@@ -105,7 +94,7 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 
 			if atomic.LoadInt32(&nested) > 0 {
 				toProgram <- append(buffered, m.Bytes())
-			} else {
+			} else if ws == nil {
 				toProgram <- [][]byte{m.Bytes()}
 			}
 
@@ -142,10 +131,6 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 				} else if n := int32(m.Mux()); n != 0 {
 					atomic.AddInt32(&muxing, n)
 					atomic.AddInt32(&nested, n)
-
-					if n > 0 {
-						toProgram <- [][]byte{bytes}
-					}
 				}
 
 				if m.Command() != "mux" && m.Command() != "run" && m.Command() != "status" {
@@ -245,7 +230,7 @@ func main() {
 			}
 
 			if m.Is(message.Escape) {
-				logf(toServer, "mux received: %v", m.Parsed())
+				logf(toServer, "mux command: %v", m.Parsed())
 
 				switch m.Command() {
 				case "pty":
@@ -269,13 +254,11 @@ func main() {
 
 						stream[id] = selected
 
-						for _, v := range buffered {
-							logf(toServer, "buffered: %v", v.Parsed())
-						}
-
 						go session(id, selected, toServer, statusq)
 					}
 				}
+			} else {
+				logf(toServer, "mux received: %v", strconv.Quote(string(m.Bytes())))
 			}
 
 			if selected == nil {
