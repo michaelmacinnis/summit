@@ -52,7 +52,7 @@ func Write(wc io.WriteCloser) chan [][]byte {
 var (
 	client = config.Get("SUMMIT_CLIENT", "summit-client")
 	mux    = config.Get("SUMMIT_MUX", "summit-mux")
-	term   = config.Get("SUMMIT_TERMINAL", "kitty")
+	term   = config.Get("SUMMIT_TERMINAL", "./xfce-terminal")
 )
 
 func address(offset int, bs [][]byte) (string, string) {
