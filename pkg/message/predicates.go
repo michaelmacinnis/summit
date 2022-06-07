@@ -3,6 +3,14 @@
 // Package message encapsulates the units emitted by the lexer.
 package message
 
+func (m *message) Completion() bool {
+    return m.Is(Escape) && m.Command() == "status"
+}
+
+func (m *message) Configuration() bool {
+	return m.Is(Escape) && m.Command() == "set-window-size"
+}
+
 func (m *message) Logging() bool {
 	return m.Is(Escape) && m.Command() == "log"
 }
@@ -15,3 +23,8 @@ func (m *message) Routing() bool {
 	cmd := m.Command()
 	return cmd == "pty" || cmd == "term"
 }
+
+func (m *message) Spawning() bool {
+    return m.Is(Escape) && m.Command() == "run"
+}
+

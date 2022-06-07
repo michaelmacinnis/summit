@@ -3,7 +3,6 @@
 package terminal
 
 import (
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -14,26 +13,13 @@ import (
 	"github.com/michaelmacinnis/summit/pkg/message"
 )
 
-var signals chan os.Signal
-
 func ForwardResize(f func(m *message.T)) func() error {
-	fd := os.Stdin
-
-	signals = make(chan os.Signal, 1)
+	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGWINCH)
 
 	go func() {
 		for range signals {
-			ws, err := pty.GetsizeFull(fd)
-			if err != nil {
-				fmt.Printf("error getting window size: %s\n", err.Error())
-				continue
-			}
-
-			f(message.KV(map[string]interface{}{
-				"cmd": "set-window-size",
-				"ws":  &ws,
-			}))
+			f(ResizeMessage())
 		}
 	}()
 
@@ -46,11 +32,11 @@ func ForwardResize(f func(m *message.T)) func() error {
 }
 
 func IsTTY() bool {
-	return term.IsTerminal(int(os.Stdin.Fd()))
+	return term.IsTerminal(int(stdin.Fd()))
 }
 
 func MakeRaw() (func() error, error) {
-	fd := int(os.Stdin.Fd())
+	fd := int(stdin.Fd())
 
 	prev, err := term.MakeRaw(fd)
 
@@ -59,6 +45,17 @@ func MakeRaw() (func() error, error) {
 	}, err
 }
 
-func Sigwinch() {
-	signals <- syscall.SIGWINCH
+func ResizeMessage() *message.T {
+	ws, err := pty.GetsizeFull(stdin)
+	if err != nil {
+		println("error getting window size:", err.Error())
+		return nil
+	}
+
+	return message.KV(map[string]interface{}{
+		"cmd": "set-window-size",
+		"ws":  &ws,
+	})
 }
+
+var stdin = os.Stdin

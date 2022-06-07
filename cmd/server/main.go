@@ -210,7 +210,7 @@ func terminal(id string, conn net.Conn, fromMux <-chan *message.T, toMux chan []
 				continue
 			}
 
-			if m.Command() == "run" {
+			if m.Spawning() {
 				go window(m, routing)
 			} else {
 				toClient <- [][]byte{m.Bytes()}

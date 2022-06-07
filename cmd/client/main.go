@@ -36,28 +36,34 @@ func main() {
 
 	errors.AtExit(c.Close)
 
+	fromServer   := comms.Chunk(c)
+	fromTerminal := comms.Chunk(os.Stdin)
+	toServer     := c
+	toTerminal   := os.Stdout
+
+	// Send routing information.
 	for _, s := range strings.Split(*path, "-") {
 		if s != "" {
-			c.Write(message.Pty(s))
+			toServer.Write(message.Pty(s))
 		}
 	}
 
+	// Send the command to run.
 	args, _ := config.Command()
-	c.Write(message.Run(args, config.Env(*j)))
+	toServer.Write(message.Run(args, config.Env(*j)))
 
-	fromServer := comms.Chunk(c)
-	fromTerminal := comms.Chunk(os.Stdin)
+	// Send the terminal size.
+	toServer.Write(terminal.ResizeMessage().Bytes())
 
-	toServer := c
-	toTerminal := os.Stdout
-
+	// Continue to send terminal size changes.
+	// These notifications are converted to look like terminal input so
+	// that they are not interleaved with other output when writing.
 	cleanup := terminal.ForwardResize(func(m *message.T) {
 		fromTerminal <- m
 	})
 	errors.AtExit(cleanup)
 
 	newline := false
-	sentsize := false
 
 	for {
 		var f io.Writer
@@ -67,12 +73,6 @@ func main() {
 		case m = <-fromTerminal:
 			f = toServer
 		case m = <-fromServer:
-			if !sentsize {
-				go terminal.Sigwinch()
-
-				sentsize = true
-			}
-
 			f = toTerminal
 		}
 
@@ -86,12 +86,13 @@ func main() {
 		if m.Is(message.Escape) {
 			if n := int32(m.Mux()); n != 0 {
 				muxing += n
-				sentsize = false
-			} else if muxing == 0 && m.Command() == "status" {
+
+				toServer.Write(terminal.ResizeMessage().Bytes())
+			} else if muxing == 0 && m.Completion() {
 				errors.Exit(m.Status())
 			}
 
-			if m.Command() != "set-window-size" {
+			if !m.Configuration() {
 				continue
 			}
 		}

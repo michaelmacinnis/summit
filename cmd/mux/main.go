@@ -86,7 +86,9 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 					if err := pty.Setsize(f, ws); err != nil {
 						println("error setting window size:", err.Error())
 					}
-				} else if m.Command() != "run" {
+				}
+
+				if m.Command() != "run" {
 					buffered = append(buffered, m.Bytes())
 					continue
 				}
