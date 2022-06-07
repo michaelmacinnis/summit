@@ -41,7 +41,7 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 
 	// Find out what terminal this session is connected to.
 	m := <-in
-	term := m.Terminal()
+	term := m.Term()
 	hdr := [][]byte{m.Bytes(), message.Pty(id)}
 
 	// Find out what command we're running.
@@ -88,8 +88,11 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 					}
 				}
 
-				if m.Command() != "run" {
+				if m.Configuration() || m.Routing() {
 					buffered = append(buffered, m.Bytes())
+				}
+
+				if !m.IsRun() {
 					continue
 				}
 			}
@@ -125,7 +128,7 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 					sent = false
 				}
 
-				terminal := m.Terminal()
+				terminal := m.Term()
 				if terminal != "" {
 					buffered[0] = m.Bytes()
 				} else if m.Pty() != "" {
@@ -135,7 +138,7 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 					atomic.AddInt32(&nested, n)
 				}
 
-				if m.Command() != "mux" && m.Command() != "run" && m.Command() != "status" {
+				if !m.Meta() || m.Routing() {
 					continue
 				}
 			}
@@ -150,10 +153,7 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 		}
 	}()
 
-	err = cmd.Wait()
-	if err != nil {
-		println("error waiting for command: %s", err.Error())
-	}
+	_ = cmd.Wait()
 
 	code := cmd.ProcessState.ExitCode()
 
@@ -216,7 +216,7 @@ func main() {
 		errors.AtExit(restore)
 
 		go session(id, c, toServer, statusq)
-		c <- message.New(message.Escape, message.Terminal(""))
+		c <- message.New(message.Escape, message.Term(""))
 		c <- message.New(message.Escape, message.Run(args, os.Environ()))
 	}
 
@@ -234,8 +234,8 @@ func main() {
 			if m.Is(message.Escape) {
 				logf(toServer, "mux command: %v", m.Parsed())
 
-				switch m.Command() {
-				case "pty":
+				switch {
+				case m.IsPty():
 					if selected == nil {
 						id = m.Pty()
 						selected = stream[id]
@@ -244,12 +244,12 @@ func main() {
 					}
 
 					fallthrough
-				case "term":
+				case m.IsTerm():
 					buffered = append(buffered, m)
 
 					continue
 
-				case "run":
+				case m.IsRun():
 					if selected == nil {
 						id = <-next
 						selected = make(chan *message.T)
@@ -289,14 +289,14 @@ func main() {
 			}
 
 			toServer <- [][]byte{
-				message.Terminal(s.term),
+				message.Term(s.term),
 				message.Status(s.rv),
 			}
 
 			if len(stream) == 0 && atomic.LoadInt32(&muxing) == 0 {
 				if term != "" {
 					toServer <- [][]byte{
-						message.Terminal(term),
+						message.Term(term),
 						message.Status(status),
 					}
 				}

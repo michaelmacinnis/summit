@@ -88,7 +88,7 @@ func main() {
 				muxing += n
 
 				toServer.Write(terminal.ResizeMessage().Bytes())
-			} else if muxing == 0 && m.Completion() {
+			} else if muxing == 0 && m.IsStatus() {
 				errors.Exit(m.Status())
 			}
 

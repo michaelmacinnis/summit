@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -e
 
 # Figure out where we are.
 Dir=$(dirname -- $(readlink -f -- "$0"))

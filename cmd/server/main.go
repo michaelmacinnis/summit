@@ -63,14 +63,14 @@ func address(offset int, bs [][]byte) (string, string) {
 
 	term := ""
 	for _, b := range bs {
-		p := message.New(message.Escape, b)
-		switch p.Command() {
-		case "pty":
-			path[n] = p.Pty()
+		m := message.New(message.Escape, b)
+		switch {
+		case m.IsPty():
+			path[n] = m.Pty()
 			n++
 
-		case "term":
-			term = p.Terminal()
+		case m.IsTerm():
+			term = m.Term()
 		}
 	}
 
@@ -113,7 +113,7 @@ func dispatch(accepted <-chan net.Conn, fromMux chan *message.T, toMux chan [][]
 					continue
 				}
 
-				if n := m.Terminal(); n != "" {
+				if n := m.Term(); n != "" {
 					id = n
 					current = terminals[id]
 				}
@@ -170,7 +170,7 @@ func terminal(id string, conn net.Conn, fromMux <-chan *message.T, toMux chan []
 	output := [][]byte{}
 	routing := [][]byte{}
 
-	header := [][]byte{message.Terminal(id)}
+	header := [][]byte{message.Term(id)}
 
 	for {
 		select {
@@ -210,11 +210,12 @@ func terminal(id string, conn net.Conn, fromMux <-chan *message.T, toMux chan []
 				continue
 			}
 
-			if m.Spawning() {
+			if m.IsRun() {
 				go window(m, routing)
-			} else {
-				toClient <- [][]byte{m.Bytes()}
+				continue
 			}
+
+			toClient <- [][]byte{m.Bytes()}
 
 			// Set header and clear routing.
 			header = routing

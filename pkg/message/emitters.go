@@ -22,7 +22,7 @@ func Status(code int) []byte {
 	return command("status", code)
 }
 
-func Terminal(terminal string) []byte {
+func Term(terminal string) []byte {
 	return command("term", terminal)
 }
 

@@ -52,7 +52,7 @@ func (m *message) Status() int {
 	return int(num(m.Parsed(), "status"))
 }
 
-func (m *message) Terminal() string {
+func (m *message) Term() string {
 	return str(m.Parsed(), "term")
 }
 
