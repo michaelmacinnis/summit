@@ -36,10 +36,10 @@ func main() {
 
 	errors.AtExit(c.Close)
 
-	fromServer   := comms.Chunk(c)
+	fromServer := comms.Chunk(c)
 	fromTerminal := comms.Chunk(os.Stdin)
-	toServer     := c
-	toTerminal   := os.Stdout
+	toServer := c
+	toTerminal := os.Stdout
 
 	// Send routing information.
 	for _, s := range strings.Split(*path, "-") {

@@ -68,10 +68,10 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 		_ = f.Close() // Best effort.
 	}()
 
-	fromProgram  := comms.Chunk(f)
+	fromProgram := comms.Chunk(f)
 	fromTerminal := in
-	toProgram    := comms.Write(f)
-	toTerminal   := out
+	toProgram := comms.Write(f)
+	toTerminal := out
 
 	nested := int32(0)
 
@@ -103,7 +103,6 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 			} else if ws == nil {
 				toProgram <- [][]byte{m.Bytes()}
 			}
-
 
 			buffered = [][]byte{}
 		}

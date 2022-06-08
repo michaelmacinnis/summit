@@ -13,19 +13,19 @@ func (m *message) IsMux() bool {
 }
 
 func (m *message) IsPty() bool {
-    return m.Is(Escape) && m.Command() == "pty"
+	return m.Is(Escape) && m.Command() == "pty"
 }
 
 func (m *message) IsRun() bool {
-    return m.Is(Escape) && m.Command() == "run"
+	return m.Is(Escape) && m.Command() == "run"
 }
 
 func (m *message) IsStatus() bool {
-    return m.Is(Escape) && m.Command() == "status"
+	return m.Is(Escape) && m.Command() == "status"
 }
 
 func (m *message) IsTerm() bool {
-    return m.Is(Escape) && m.Command() == "term"
+	return m.Is(Escape) && m.Command() == "term"
 }
 
 func (m *message) Logging() bool {
@@ -49,4 +49,3 @@ func (m *message) Routing() bool {
 	cmd := m.Command()
 	return cmd == "pty" || cmd == "term"
 }
-
