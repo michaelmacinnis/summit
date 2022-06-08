@@ -226,7 +226,7 @@ func main() {
 		c <- message.New(message.Escape, message.Run(args, os.Environ()))
 	}
 
-	buffered := []*message.T{}
+	routing := []*message.T{}
 
 	var selected chan *message.T
 
@@ -245,13 +245,14 @@ func main() {
 					if selected == nil {
 						id = m.Pty()
 						selected = stream[id]
-
-						continue
+					} else {
+						routing = append(routing, m)
 					}
 
-					fallthrough
+					continue
+
 				case m.IsTerm():
-					buffered = append(buffered, m)
+					routing = []*message.T{m}
 
 					continue
 
@@ -276,10 +277,9 @@ func main() {
 				}
 			}
 
-			for _, b := range buffered {
+			for _, b := range routing {
 				selected <- b
 			}
-			buffered = []*message.T{}
 
 			selected <- m
 
