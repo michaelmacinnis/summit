@@ -41,10 +41,16 @@ func main() {
 	toServer := c
 	toTerminal := os.Stdout
 
+	routing := [][]byte{}
+
 	// Send routing information.
 	for _, s := range strings.Split(*path, "-") {
 		if s != "" {
-			toServer.Write(message.Pty(s))
+			b := message.Pty(s)
+
+			routing = append(routing, b)
+
+			toServer.Write(b)
 		}
 	}
 
@@ -64,6 +70,7 @@ func main() {
 	errors.AtExit(cleanup)
 
 	newline := false
+	sent := true
 
 	for {
 		var f io.Writer
@@ -71,35 +78,61 @@ func main() {
 
 		select {
 		case m = <-fromTerminal:
+			if m == nil {
+				goto done
+			}
+
 			f = toServer
+
+			// Send routing information.
+			for _, b := range routing {
+				toServer.Write(b)
+			}
+
 		case m = <-fromServer:
+			if m == nil {
+				goto done
+			}
+
 			f = toTerminal
-		}
 
-		if m == nil {
-			if !newline {
-				toTerminal.Write(message.CRLF)
-			}
-			break
-		}
+			if m.Is(message.Escape) {
+				if sent {
+					routing = [][]byte{}
 
-		if m.Is(message.Escape) {
-			if n := int32(m.Mux()); n != 0 {
-				muxing += n
+					sent = false
+				}
 
-				toServer.Write(terminal.ResizeMessage().Bytes())
-			} else if muxing == 0 && m.IsStatus() {
-				errors.Exit(m.Status())
-			}
+				if m.IsPty() {
+					routing = append(routing, m.Bytes())
+				} else if n := int32(m.Mux()); n != 0 {
+					muxing += n
 
-			if !m.Configuration() {
+					// Send routing information.
+					for _, b := range routing {
+						toServer.Write(b)
+					}
+
+					toServer.Write(terminal.ResizeMessage().Bytes())
+				} else if muxing == 0 && m.IsStatus() {
+					errors.Exit(m.Status())
+				}
+
 				continue
 			}
+
 		}
 
 		s := m.Bytes()
 		f.Write(s)
 
 		newline = bytes.HasSuffix(s, message.CRLF)
+
+		sent = true
+	}
+
+done:
+	if !newline {
+		toTerminal.Write(message.CRLF)
 	}
 }

@@ -157,47 +157,38 @@ func terminal(id string, conn net.Conn, fromMux <-chan *message.T, toMux chan []
 	fromClient := comms.Chunk(conn)
 	toClient := comms.Write(conn)
 
-	output := [][]byte{}
+	header := [][]byte{message.Term(id)}
 	routing := [][]byte{}
 
-	header := [][]byte{message.Term(id)}
+	sent := false
 
 	for {
 		select {
 		case m, ok := <-fromClient:
-			if !ok {
+			if !ok || m == nil {
+				println("client channel closed or nil message.")
 				goto done
 			}
 
 			if m.Routing() {
-				output = append(output, m.Bytes())
+				if sent {
+					routing = [][]byte{}
+					sent = false
+				}
+
+				routing = append(routing, m.Bytes())
 				continue
 			}
 
-			toMux <- append(append(header, output...), m.Bytes())
+			toMux <- append(append(header, routing...), m.Bytes())
 
-			// Clear program input buffer.
-			output = [][]byte{}
+			sent = true
 
 		// From mux (after being demultiplexed by the dispatcher).
 		case m, ok := <-fromMux:
 			if !ok || m == nil {
-				println("Channel closed or nil message.")
+				println("mux channel closed or nil message.")
 				goto done
-			}
-
-			/*
-				s := strconv.Quote(string(m.Bytes()))
-				if m.Is(message.Escape) {
-					s = fmt.Sprintf("%v", m.Parsed())
-				}
-
-				println("FROM MUX:", s)
-			*/
-
-			if m.Routing() {
-				routing = append(routing, m.Bytes())
-				continue
 			}
 
 			if m.IsRun() {
@@ -206,10 +197,6 @@ func terminal(id string, conn net.Conn, fromMux <-chan *message.T, toMux chan []
 			}
 
 			toClient <- [][]byte{m.Bytes()}
-
-			// Set header and clear routing.
-			header = routing
-			routing = [][]byte{}
 		}
 	}
 
