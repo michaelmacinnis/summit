@@ -37,14 +37,11 @@ func logf(out chan [][]byte, format string, i ...interface{}) {
 }
 
 func session(id string, in chan *message.T, out chan [][]byte, statusq chan Status) {
-	logf(out, "launching %s", id)
-
-	// Find out what terminal this session is connected to.
+	// First message should be the terminal for this session.
 	m := <-in
 	term := m.Term()
-	hdr := [][]byte{m.Bytes(), message.Pty(id)}
 
-	// Find out what command we're running.
+	// Second message should be the command (and environment).
 	m = <-in
 	args := m.Args()
 
@@ -53,13 +50,16 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 	cmd.Env = m.Env()
 	cmd.Dir = wd(cmd.Env)
 
+	logf(out, "[%s] launching %#v (%#v)", id, args, cmd.Env)
+
+	// Always send a status message on completion.
 	defer func() {
 		statusq <- Status{id, cmd.ProcessState.ExitCode(), term}
 	}()
 
 	f, err := pty.Start(cmd)
 	if err != nil {
-		println(err.Error())
+		logf(out, "[%s] error: launching: %s", id, err.Error())
 
 		return
 	}
@@ -86,7 +86,7 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 					ws = m.WindowSize()
 					if ws != nil {
 						if err := pty.Setsize(f, ws); err != nil {
-							println("error setting window size:", err.Error())
+							logf(out, "[%s] error: setting size: %s", id, err.Error())
 						}
 					}
 
@@ -109,7 +109,7 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 	}()
 
 	go func() {
-		buffered := append([][]byte{}, hdr...)
+		buffered := [][]byte{message.Term(term), message.Pty(id)}
 
 		sent := false
 
@@ -122,7 +122,7 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 				}
 
 				if sent {
-					buffered = append([][]byte{}, hdr...)
+					buffered = [][]byte{message.Term(term), message.Pty(id)}
 
 					sent = false
 				}
@@ -209,8 +209,8 @@ func main() {
 	id := "0"
 
 	if terminal.IsTTY() {
-
 		println("launching", fmt.Sprintf("%v", args))
+
 		// TODO: Launch as shim.
 		c := make(chan *message.T)
 		stream[id] = c

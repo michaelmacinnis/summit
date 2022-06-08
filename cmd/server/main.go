@@ -28,16 +28,6 @@ func Write(wc io.WriteCloser) chan [][]byte {
 		for bs := range c {
 			for _, b := range bs {
 				if b != nil {
-
-					/*
-						// This block is just for debugging.
-						s := strconv.Quote(string(b))
-						if m := message.Deserialize(b); m != nil {
-							s = fmt.Sprintf("%v", m)
-						}
-						println("TO MUX:", s)
-					*/
-
 					_, err := wc.Write(b)
 					if err != nil {
 						println(err.Error())
