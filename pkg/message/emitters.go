@@ -10,7 +10,7 @@ func Pty(pty string) []byte {
 	return command("pty", pty)
 }
 
-func Run(cmd []string, env []string) []byte {
+func Run(cmd, env []string) []byte {
 	return Serialize(map[string]interface{}{
 		"cmd": "run",
 		"run": cmd,
