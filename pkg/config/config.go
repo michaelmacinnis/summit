@@ -14,10 +14,10 @@ var (
 func Command() ([]string, bool) {
 	args := flag.Args()
 	if len(args) > 0 {
-		return args, true
+		return args, false
 	}
 
-	return []string{command}, false
+	return []string{command}, true
 }
 
 func Env(j string) []string {
@@ -43,10 +43,11 @@ func Get(k, dflt string) string {
 	return dflt
 }
 
-func Socket() string {
-	return socket
+func Parse() {
+	flag.StringVar(&socket, "s", socket, "path to summit server socket")
+	flag.Parse()
 }
 
-func init() {
-	flag.StringVar(&socket, "s", socket, "path to summit server socket")
+func Socket() string {
+	return socket
 }

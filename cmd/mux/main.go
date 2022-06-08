@@ -53,42 +53,43 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 	cmd.Env = m.Env()
 	cmd.Dir = wd(cmd.Env)
 
-	//logf(out, "environment: %#v", cmd.Env)
+	defer func() {
+		statusq <- Status{id, cmd.ProcessState.ExitCode(), term}
+	}()
 
 	f, err := pty.Start(cmd)
 	if err != nil {
 		println(err.Error())
 
-		code := cmd.ProcessState.ExitCode()
-		statusq <- Status{id, code, term}
+		return
 	}
 
 	defer func() {
 		_ = f.Close() // Best effort.
 	}()
 
-	// println("session: started")
-
-	fromProgram := comms.Chunk(f)
-	toProgram := comms.Write(f)
+	fromProgram  := comms.Chunk(f)
+	fromTerminal := in
+	toProgram    := comms.Write(f)
+	toTerminal   := out
 
 	nested := int32(0)
 
 	go func() {
 		buffered := [][]byte{}
 
-		for m := range in {
+		for m := range fromTerminal {
 			var ws *pty.Winsize
 
 			if m.Is(message.Escape) {
-				ws = m.WindowSize()
-				if ws != nil {
-					if err := pty.Setsize(f, ws); err != nil {
-						println("error setting window size:", err.Error())
-					}
-				}
-
 				if m.Configuration() || m.Routing() {
+					ws = m.WindowSize()
+					if ws != nil {
+						if err := pty.Setsize(f, ws); err != nil {
+							println("error setting window size:", err.Error())
+						}
+					}
+
 					buffered = append(buffered, m.Bytes())
 				}
 
@@ -116,48 +117,41 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 		for m := range fromProgram {
 			if m.Is(message.Escape) {
 				if m.Logging() {
-					out <- [][]byte{m.Bytes()}
+					toTerminal <- [][]byte{m.Bytes()}
 
 					continue
 				}
 
 				if sent {
-					buffered = make([][]byte, len(hdr))
-					copy(buffered, hdr)
+					buffered = append([][]byte{}, hdr...)
 
 					sent = false
 				}
 
-				terminal := m.Term()
-				if terminal != "" {
-					buffered[0] = m.Bytes()
-				} else if m.Pty() != "" {
-					buffered = append(buffered, m.Bytes())
-				} else if n := int32(m.Mux()); n != 0 {
+				if n := int32(m.Mux()); n != 0 {
 					atomic.AddInt32(&muxing, n)
 					atomic.AddInt32(&nested, n)
 				}
 
-				if !m.Meta() || m.Routing() {
+				if m.Configuration() || m.Routing() {
+					terminal := m.Term()
+					if terminal != "" {
+						buffered[0] = m.Bytes()
+					} else if m.Pty() != "" {
+						buffered = append(buffered, m.Bytes())
+					}
+
 					continue
 				}
 			}
 
-			// println("session: sending", m.String())
-
-			// println("mux:", len(buffered))
-
-			out <- append(buffered, m.Bytes())
+			toTerminal <- append(buffered, m.Bytes())
 
 			sent = true
 		}
 	}()
 
 	_ = cmd.Wait()
-
-	code := cmd.ProcessState.ExitCode()
-
-	statusq <- Status{id, code, term}
 }
 
 func wd(env []string) string {
@@ -173,16 +167,27 @@ func wd(env []string) string {
 func main() {
 	request := false
 
+	flag.Usage = func() {
+		f := flag.CommandLine.Output()
+		fmt.Fprintf(f, "%s\n\nUsage:\n", os.Args[0])
+		fmt.Fprintf(f, "  %s [-l LABEL] COMMAND ARGUMENTS...\n", os.Args[0])
+		fmt.Fprintf(f, "  %s -n\n\n", os.Args[0])
+		flag.PrintDefaults()
+	}
+
 	flag.StringVar(&label, "l", label, "mux label (for debugging)")
 	flag.BoolVar(&request, "n", request, "request new local session")
 	flag.Parse()
 
-	args, explicit := config.Command()
-	// println("args", explicit, fmt.Sprintf("%v", args))
+	args, defaulted := config.Command()
 
 	if request {
 		os.Stdout.Write(message.Run(args, os.Environ()))
 		return
+	} else if defaulted && terminal.IsTTY() {
+		flag.Usage()
+
+		errors.Exit(1)
 	}
 
 	stream := map[string]chan *message.T{}
@@ -204,7 +209,8 @@ func main() {
 
 	id := "0"
 
-	if terminal.IsTTY() && explicit {
+	if terminal.IsTTY() {
+
 		println("launching", fmt.Sprintf("%v", args))
 		// TODO: Launch as shim.
 		c := make(chan *message.T)

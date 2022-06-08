@@ -24,7 +24,7 @@ func main() {
 
 	j := flag.String("e", "", "environment (as a JSON array)")
 	path := flag.String("p", "", "routing path")
-	flag.Parse()
+	config.Parse()
 
 	restore, err := terminal.MakeRaw()
 	errors.On(err).Die("failed to put terminal in raw mode")

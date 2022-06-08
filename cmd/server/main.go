@@ -261,7 +261,7 @@ func main() {
 	flag.StringVar(&client, "c", client, "path to summit client")
 	flag.StringVar(&mux, "m", mux, "path to summit mux")
 	flag.StringVar(&term, "t", term, "path to terminal emulator")
-	flag.Parse()
+	config.Parse()
 
 	accepted := make(chan net.Conn)
 
