@@ -28,7 +28,6 @@ func MakeRaw() (func() error, error) {
 }
 
 func OnResize(f func()) func() error {
-	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGWINCH)
 
 	go func() {
@@ -52,6 +51,10 @@ func ResizeMessage() *message.T {
 	})
 }
 
+func TriggerResize() {
+	signals <- syscall.SIGWINCH
+}
+
 func WindowSize() *pty.Winsize {
     ws, err := pty.GetsizeFull(stdin)
     if err != nil {
@@ -62,4 +65,7 @@ func WindowSize() *pty.Winsize {
 	return ws
 }
 
-var stdin = os.Stdin
+var (
+	signals = make(chan os.Signal, 1)
+	stdin   = os.Stdin
+)

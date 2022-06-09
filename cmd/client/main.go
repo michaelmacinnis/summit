@@ -108,9 +108,7 @@ func main() {
 
 				buf.Remove()
 
-				go func() {
-					fromTerminal <-terminal.ResizeMessage()
-				}()
+				terminal.TriggerResize()
 
 				continue
 			}
