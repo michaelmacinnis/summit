@@ -46,16 +46,20 @@ func MakeRaw() (func() error, error) {
 }
 
 func ResizeMessage() *message.T {
-	ws, err := pty.GetsizeFull(stdin)
-	if err != nil {
-		println("error getting window size:", err.Error())
-		return nil
-	}
-
 	return message.KV(map[string]interface{}{
 		"cmd": "set-window-size",
-		"ws":  &ws,
+		"ws":  WindowSize(),
 	})
+}
+
+func WindowSize() *pty.Winsize {
+    ws, err := pty.GetsizeFull(stdin)
+    if err != nil {
+        println("error getting window size:", err.Error())
+        return nil
+    }
+
+	return ws
 }
 
 var stdin = os.Stdin

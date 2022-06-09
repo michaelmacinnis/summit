@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 
 	"github.com/creack/pty"
+//	"github.com/michaelmacinnis/summit/pkg/buffer"
 	"github.com/michaelmacinnis/summit/pkg/comms"
 	"github.com/michaelmacinnis/summit/pkg/config"
 	"github.com/michaelmacinnis/summit/pkg/errors"
@@ -37,11 +38,7 @@ func logf(out chan [][]byte, format string, i ...interface{}) {
 }
 
 func session(id string, in chan *message.T, out chan [][]byte, statusq chan Status) {
-	// First message should be the terminal size.
-	// m := <-in
-	// ws := m.WindowSize()
-
-	// Second message should be the terminal for this session.
+	// First message should be the terminal for this session.
 	logf(out, "[%s] getting terminal id", id)
 
 	m := <-in
@@ -49,9 +46,10 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 
 	logf(out, "[%s] got terminal id %s:%s", id, m.Command(), term)
 
-	// Third message should be the command (and environment).
+	// Second message should be the command, environment, and window size.
 	m = <-in
 	args := m.Args()
+	ws   := m.WindowSize()
 
 	logf(out, "[%s] sending new pty id", id)
 	out <- [][]byte{message.Term(term), message.Pty(id), message.Started()}
@@ -79,13 +77,11 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 		_ = f.Close() // Best effort.
 	}()
 
-/*
 	if ws != nil {
 		if err := pty.Setsize(f, ws); err != nil {
 			logf(out, "[%s] error: setting size: %s", id, err.Error())
 		}
 	}
-*/
 
 	fromProgram := comms.Chunk(f)
 	fromTerminal := in
@@ -200,7 +196,7 @@ func main() {
 	args, defaulted := config.Command()
 
 	if request {
-		os.Stdout.Write(message.Run(args, os.Environ()))
+		os.Stdout.Write(message.Run(args, os.Environ(), nil))
 		return
 	} else if defaulted && terminal.IsTTY() {
 		flag.Usage()
@@ -241,7 +237,7 @@ func main() {
 
 		go session(id, c, toServer, statusq)
 		c <- message.New(message.Escape, message.Term(""))
-		c <- message.New(message.Escape, message.Run(args, os.Environ()))
+		c <- message.New(message.Escape, message.Run(args, os.Environ(), terminal.WindowSize()))
 	}
 
 	routing := []*message.T{}

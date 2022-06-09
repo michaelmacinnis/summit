@@ -53,10 +53,7 @@ func main() {
 
 	// Send the command to run.
 	args, _ := config.Command()
-	toServer.Write(message.Run(args, config.Env(*j)))
-
-	// Send the terminal size.
-	//toServer.Write(terminal.ResizeMessage().Bytes())
+	toServer.Write(message.Run(args, config.Env(*j), terminal.WindowSize()))
 
 	// Continue to send terminal size changes.
 	// These notifications are converted to look like terminal input so
