@@ -5,7 +5,7 @@ package message
 
 func (m *message) Configuration() bool {
 	// NOTE: This may be expanded to include other commands.
-	return m.Is(Escape) && m.Command() == "set-window-size"
+	return m.Is(Escape) && m.Command() == "ws"
 }
 
 func (m *message) IsMux() bool {

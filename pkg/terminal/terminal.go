@@ -47,7 +47,7 @@ func MakeRaw() (func() error, error) {
 
 func ResizeMessage() *message.T {
 	return message.KV(map[string]interface{}{
-		"cmd": "set-window-size",
+		"cmd": "ws",
 		"ws":  WindowSize(),
 	})
 }
