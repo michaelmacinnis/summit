@@ -60,6 +60,16 @@ func (b *Buffer) Message(m *message.T) bool {
 	return b.buffering
 }
 
+func (b *Buffer) Remove() {
+	b.Lock()
+	defer b.Unlock()
+
+	sz := len(b.routing)
+	if sz > 0 {
+		b.routing = b.routing[:sz-1]
+	}
+}
+
 func (b *Buffer) Routing() [][]byte {
 	b.RLock()
 	defer b.RUnlock()

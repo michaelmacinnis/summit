@@ -58,8 +58,8 @@ func main() {
 	// Continue to send terminal size changes.
 	// These notifications are converted to look like terminal input so
 	// that they are not interleaved with other output when writing.
-	cleanup := terminal.ForwardResize(func(m *message.T) {
-		fromTerminal <- m
+	cleanup := terminal.OnResize(func() {
+		fromTerminal <- terminal.ResizeMessage()
 	})
 	errors.AtExit(cleanup)
 
@@ -94,13 +94,6 @@ func main() {
 			if n := int32(m.Mux()); n != 0 {
 				muxing += n
 
-				// Send routing information.
-				for _, b := range buf.Routing() {
-					toServer.Write(b)
-				}
-
-				toServer.Write(terminal.ResizeMessage().Bytes())
-
 				continue
 			}
 
@@ -112,6 +105,12 @@ func main() {
 				if muxing == 0 {
 					errors.Exit(m.Status())
 				}
+
+				buf.Remove()
+
+				go func() {
+					fromTerminal <-terminal.ResizeMessage()
+				}()
 
 				continue
 			}

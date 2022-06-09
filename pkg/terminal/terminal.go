@@ -13,24 +13,6 @@ import (
 	"github.com/michaelmacinnis/summit/pkg/message"
 )
 
-func ForwardResize(f func(m *message.T)) func() error {
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGWINCH)
-
-	go func() {
-		for range signals {
-			f(ResizeMessage())
-		}
-	}()
-
-	return func() error {
-		signal.Stop(signals)
-		close(signals)
-
-		return nil
-	}
-}
-
 func IsTTY() bool {
 	return term.IsTerminal(int(stdin.Fd()))
 }
@@ -43,6 +25,24 @@ func MakeRaw() (func() error, error) {
 	return func() error {
 		return term.Restore(fd, prev)
 	}, err
+}
+
+func OnResize(f func()) func() error {
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGWINCH)
+
+	go func() {
+		for range signals {
+			f()
+		}
+	}()
+
+	return func() error {
+		signal.Stop(signals)
+		close(signals)
+
+		return nil
+	}
 }
 
 func ResizeMessage() *message.T {
