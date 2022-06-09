@@ -317,6 +317,7 @@ func main() {
 
 			toServer <- [][]byte{
 				message.Term(s.term),
+				message.Pty(s.pty),
 				message.Status(s.rv),
 			}
 
@@ -324,6 +325,7 @@ func main() {
 				if term != "" {
 					toServer <- [][]byte{
 						message.Term(term),
+						message.Pty("0"),
 						message.Status(status),
 					}
 				}

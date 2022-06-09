@@ -105,11 +105,17 @@ func main() {
 				toServer.Write(terminal.ResizeMessage().Bytes())
 
 				continue
-			} else if muxing == 0 && m.IsStatus() {
-				errors.Exit(m.Status())
 			}
 
 			if buf.Message(m) {
+				continue
+			}
+
+			if m.IsStatus() {
+				if muxing == 0 {
+					errors.Exit(m.Status())
+				}
+
 				continue
 			}
 

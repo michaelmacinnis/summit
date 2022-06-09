@@ -178,16 +178,20 @@ func terminal(id string, conn net.Conn, fromMux <-chan *message.T, toMux chan []
 
 	println("getting response from mux")
 
+	src := buffer.New()
+
 	buf = [][]byte{}
 	for {
 		m := <-fromMux
 
-		println("mux response", m.String())
 		buf = append(buf, m.Bytes())
+
+		src.Message(m)
 
 		if m.IsStarted() {
 			break
 		}
+
 	}
 
 	println("sending response to client")
@@ -195,7 +199,6 @@ func terminal(id string, conn net.Conn, fromMux <-chan *message.T, toMux chan []
 	toClient <- buf
 
 	dst := buffer.New(term)
-	src := buffer.New()
 
 	for {
 		select {

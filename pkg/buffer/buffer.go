@@ -15,6 +15,7 @@ type Buffer struct {
 	prefix []*message.T
 
 	buffering bool
+	completed bool
 
 	buffer  [][]byte
 	routing [][]byte
@@ -22,6 +23,7 @@ type Buffer struct {
 
 func New(prefix ...*message.T) *Buffer {
 	return &Buffer{
+		buffer:  bytes(prefix),
 		prefix:  prefix,
 		routing: bytes(prefix),
 	}
@@ -34,9 +36,7 @@ func (b *Buffer) Message(m *message.T) bool {
 	if m.Routing() {
 		if !b.buffering {
 			b.buffering = true
-
-			b.routing = b.buffer
-			b.buffer  = bytes(b.prefix)
+			b.completed = false
 		}
 
 		if m.IsPty() {
@@ -47,6 +47,13 @@ func (b *Buffer) Message(m *message.T) bool {
 			}
 		}
 	} else {
+		if !b.completed {
+			b.completed = true
+
+			b.routing = b.buffer
+			b.buffer  = bytes(b.prefix)
+		}
+
 		b.buffering = false
 	}
 
