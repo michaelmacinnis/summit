@@ -163,42 +163,29 @@ func terminal(id string, conn net.Conn, fromMux <-chan *message.T, toMux chan []
 
 	println("getting request from client")
 
-	buf := [][]byte{term.Bytes()}
-	for {
-		m := <-fromClient
+	dst := buffer.New(term)
 
-		buf = append(buf, m.Bytes())
-
-		if m.IsRun() {
-			break
-		}
+	m := <-fromClient
+	for dst.Message(m) {
+		m = <-fromClient
 	}
 
-	toMux <- buf
+	println("sending request to mux")
+
+	toMux <- append(dst.Routing(), m.Bytes())
 
 	println("getting response from mux")
 
 	src := buffer.New()
 
-	buf = [][]byte{}
-	for {
-		m := <-fromMux
-
-		buf = append(buf, m.Bytes())
-
-		src.Message(m)
-
-		if m.IsStarted() {
-			break
-		}
-
+	m = <-fromMux
+	for src.Message(m) {
+		m = <-fromMux
 	}
 
 	println("sending response to client")
 	
-	toClient <- buf
-
-	dst := buffer.New(term)
+	toClient <- append(src.Routing(), m.Bytes())
 
 	for {
 		select {
