@@ -13,6 +13,7 @@ import (
 	//	"strconv"
 	"strings"
 
+	"github.com/michaelmacinnis/summit/pkg/buffer"
 	"github.com/michaelmacinnis/summit/pkg/comms"
 	"github.com/michaelmacinnis/summit/pkg/config"
 	"github.com/michaelmacinnis/summit/pkg/errors"
@@ -40,7 +41,6 @@ func Write(wc io.WriteCloser) chan [][]byte {
 	return c
 }
 
-// TODO: allow overrides at the command line or with an environment variable.
 var (
 	client = config.Get("SUMMIT_CLIENT", "summit-client")
 	mux    = config.Get("SUMMIT_MUX", "summit-mux")
@@ -157,10 +157,42 @@ func terminal(id string, conn net.Conn, fromMux <-chan *message.T, toMux chan []
 	fromClient := comms.Chunk(conn)
 	toClient := comms.Write(conn)
 
-	header := [][]byte{message.Term(id)}
-	routing := [][]byte{}
+	hdr := [][]byte{message.Term(id)}
 
-	sent := false
+	println("getting request from client")
+
+	buf := [][]byte{}
+	for {
+		m := <-fromClient
+
+		buf = append(buf, m.Bytes())
+
+		if m.IsRun() {
+			break
+		}
+	}
+
+	toMux <- append(hdr, buf...)
+
+	println("getting response from mux")
+
+	buf = [][]byte{}
+	for {
+		m := <-fromMux
+
+		buf = append(buf, m.Bytes())
+
+		if m.IsNewPty() {
+			break
+		}
+	}
+
+	println("sending response to client")
+	
+	toClient <- buf
+
+	dst := buffer.New(hdr)
+	src := buffer.New(nil)
 
 	for {
 		select {
@@ -170,19 +202,11 @@ func terminal(id string, conn net.Conn, fromMux <-chan *message.T, toMux chan []
 				goto done
 			}
 
-			if m.Routing() {
-				if sent {
-					routing = [][]byte{}
-					sent = false
-				}
-
-				routing = append(routing, m.Bytes())
+			if dst.Message(m) {
 				continue
 			}
 
-			toMux <- append(append(header, routing...), m.Bytes())
-
-			sent = true
+			toMux <- append(dst.Routing(), m.Bytes())
 
 		// From mux (after being demultiplexed by the dispatcher).
 		case m, ok := <-fromMux:
@@ -191,12 +215,15 @@ func terminal(id string, conn net.Conn, fromMux <-chan *message.T, toMux chan []
 				goto done
 			}
 
-			if m.IsRun() {
-				go window(m, routing)
+			if src.Message(m) {
 				continue
 			}
 
-			toClient <- [][]byte{m.Bytes()}
+			if m.IsRun() {
+				go window(m, src.Routing())
+			} else {
+				toClient <- [][]byte{m.Bytes()}
+			}
 		}
 	}
 

@@ -38,12 +38,21 @@ func logf(out chan [][]byte, format string, i ...interface{}) {
 
 func session(id string, in chan *message.T, out chan [][]byte, statusq chan Status) {
 	// First message should be the terminal for this session.
+	logf(out, "[%s] getting terminal id", id)
+
 	m := <-in
 	term := m.Term()
+
+	logf(out, "[%s] got terminal id %s:%s", id, m.Command(), term)
 
 	// Second message should be the command (and environment).
 	m = <-in
 	args := m.Args()
+
+	// TODO: We should also read the resize message here.
+
+	logf(out, "[%s] sending new pty id", id)
+	out <- [][]byte{message.Term(term), message.NewPty(id)}
 
 	cmd := exec.Command(args[0], args[1:]...) //nolint:gosec
 

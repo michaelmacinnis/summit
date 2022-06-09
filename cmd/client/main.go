@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/michaelmacinnis/summit/pkg/buffer"
 	"github.com/michaelmacinnis/summit/pkg/comms"
 	"github.com/michaelmacinnis/summit/pkg/config"
 	"github.com/michaelmacinnis/summit/pkg/errors"
@@ -41,24 +42,27 @@ func main() {
 	toServer := c
 	toTerminal := os.Stdout
 
-	routing := [][]byte{}
-
-	// Send routing information.
+	// Send the command to run.
 	for _, s := range strings.Split(*path, "-") {
 		if s != "" {
 			b := message.Pty(s)
-
-			routing = append(routing, b)
 
 			toServer.Write(b)
 		}
 	}
 
-	// Send the command to run.
 	args, _ := config.Command()
 	toServer.Write(message.Run(args, config.Env(*j)))
 
 	// Send the terminal size.
+	for _, s := range strings.Split(*path, "-") {
+		if s != "" {
+			b := message.Pty(s)
+
+			toServer.Write(b)
+		}
+	}
+
 	toServer.Write(terminal.ResizeMessage().Bytes())
 
 	// Continue to send terminal size changes.
@@ -69,8 +73,12 @@ func main() {
 	})
 	errors.AtExit(cleanup)
 
+	term := <-fromServer
+	npty := <-fromServer
+
+	buf := buffer.New([][]byte{term.Bytes(), message.Pty(npty.Pty())})
+
 	newline := false
-	sent := true
 
 	for {
 		var f io.Writer
@@ -85,7 +93,7 @@ func main() {
 			f = toServer
 
 			// Send routing information.
-			for _, b := range routing {
+			for _, b := range buf.Routing() {
 				toServer.Write(b)
 			}
 
@@ -94,22 +102,16 @@ func main() {
 				goto done
 			}
 
-			f = toTerminal
+			if buf.Message(m) {
+				continue
+			}
 
 			if m.Is(message.Escape) {
-				if sent {
-					routing = [][]byte{}
-
-					sent = false
-				}
-
-				if m.IsPty() {
-					routing = append(routing, m.Bytes())
-				} else if n := int32(m.Mux()); n != 0 {
+				if n := int32(m.Mux()); n != 0 {
 					muxing += n
 
 					// Send routing information.
-					for _, b := range routing {
+					for _, b := range buf.Routing() {
 						toServer.Write(b)
 					}
 
@@ -121,14 +123,14 @@ func main() {
 				continue
 			}
 
+			f = toTerminal
+
 		}
 
 		s := m.Bytes()
 		f.Write(s)
 
 		newline = bytes.HasSuffix(s, message.CRLF)
-
-		sent = true
 	}
 
 done:

@@ -12,6 +12,10 @@ func (m *message) IsMux() bool {
 	return m.Is(Escape) && m.Command() == "mux"
 }
 
+func (m *message) IsNewPty() bool {
+	return m.Is(Escape) && m.Command() == "new-pty"
+}
+
 func (m *message) IsPty() bool {
 	return m.Is(Escape) && m.Command() == "pty"
 }

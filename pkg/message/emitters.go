@@ -6,6 +6,13 @@ func Mux(mux int) []byte {
 	return command("mux", mux)
 }
 
+func NewPty(pty string) []byte {
+	return Serialize(map[string]interface{}{
+		"cmd": "new-pty",
+		"pty": pty,
+	})
+}
+
 func Pty(pty string) []byte {
 	return command("pty", pty)
 }
