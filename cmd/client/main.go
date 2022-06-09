@@ -42,7 +42,7 @@ func main() {
 	toServer := c
 	toTerminal := os.Stdout
 
-	// Send the command to run.
+	// Send routing.
 	for _, s := range strings.Split(*path, "-") {
 		if s != "" {
 			b := message.Pty(s)
@@ -51,19 +51,12 @@ func main() {
 		}
 	}
 
+	// Send the command to run.
 	args, _ := config.Command()
 	toServer.Write(message.Run(args, config.Env(*j)))
 
 	// Send the terminal size.
-	for _, s := range strings.Split(*path, "-") {
-		if s != "" {
-			b := message.Pty(s)
-
-			toServer.Write(b)
-		}
-	}
-
-	toServer.Write(terminal.ResizeMessage().Bytes())
+	//toServer.Write(terminal.ResizeMessage().Bytes())
 
 	// Continue to send terminal size changes.
 	// These notifications are converted to look like terminal input so
@@ -73,10 +66,9 @@ func main() {
 	})
 	errors.AtExit(cleanup)
 
-	term := <-fromServer
-	npty := <-fromServer
+	buf := buffer.New()
 
-	buf := buffer.New([][]byte{term.Bytes(), message.Pty(npty.Pty())})
+	for buf.Message(<-fromServer) {}
 
 	newline := false
 
@@ -102,24 +94,22 @@ func main() {
 				goto done
 			}
 
-			if buf.Message(m) {
-				continue
-			}
+			if n := int32(m.Mux()); n != 0 {
+				muxing += n
 
-			if m.Is(message.Escape) {
-				if n := int32(m.Mux()); n != 0 {
-					muxing += n
-
-					// Send routing information.
-					for _, b := range buf.Routing() {
-						toServer.Write(b)
-					}
-
-					toServer.Write(terminal.ResizeMessage().Bytes())
-				} else if muxing == 0 && m.IsStatus() {
-					errors.Exit(m.Status())
+				// Send routing information.
+				for _, b := range buf.Routing() {
+					toServer.Write(b)
 				}
 
+				toServer.Write(terminal.ResizeMessage().Bytes())
+
+				continue
+			} else if muxing == 0 && m.IsStatus() {
+				errors.Exit(m.Status())
+			}
+
+			if buf.Message(m) {
 				continue
 			}
 

@@ -106,6 +106,8 @@ func dispatch(accepted <-chan net.Conn, fromMux chan *message.T, toMux chan [][]
 				if n := m.Term(); n != "" {
 					id = n
 					current = terminals[id]
+
+					continue
 				}
 			}
 
@@ -157,11 +159,11 @@ func terminal(id string, conn net.Conn, fromMux <-chan *message.T, toMux chan []
 	fromClient := comms.Chunk(conn)
 	toClient := comms.Write(conn)
 
-	hdr := [][]byte{message.Term(id)}
+	term := message.New(message.Escape, message.Term(id))
 
 	println("getting request from client")
 
-	buf := [][]byte{}
+	buf := [][]byte{term.Bytes()}
 	for {
 		m := <-fromClient
 
@@ -172,7 +174,7 @@ func terminal(id string, conn net.Conn, fromMux <-chan *message.T, toMux chan []
 		}
 	}
 
-	toMux <- append(hdr, buf...)
+	toMux <- buf
 
 	println("getting response from mux")
 
@@ -180,9 +182,10 @@ func terminal(id string, conn net.Conn, fromMux <-chan *message.T, toMux chan []
 	for {
 		m := <-fromMux
 
+		println("mux response", m.String())
 		buf = append(buf, m.Bytes())
 
-		if m.IsNewPty() {
+		if m.IsStarted() {
 			break
 		}
 	}
@@ -191,8 +194,8 @@ func terminal(id string, conn net.Conn, fromMux <-chan *message.T, toMux chan []
 	
 	toClient <- buf
 
-	dst := buffer.New(hdr)
-	src := buffer.New(nil)
+	dst := buffer.New(term)
+	src := buffer.New()
 
 	for {
 		select {
@@ -222,7 +225,7 @@ func terminal(id string, conn net.Conn, fromMux <-chan *message.T, toMux chan []
 			if m.IsRun() {
 				go window(m, src.Routing())
 			} else {
-				toClient <- [][]byte{m.Bytes()}
+				toClient <- append(src.Routing(), m.Bytes())
 			}
 		}
 	}
