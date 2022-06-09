@@ -100,7 +100,11 @@ func main() {
 				continue
 			}
 
-			if m.IsStatus() {
+			if m.IsStarted() {
+				terminal.TriggerResize()
+
+				continue
+			} else if m.IsStatus() {
 				if muxing == 0 {
 					errors.Exit(m.Status())
 				}
