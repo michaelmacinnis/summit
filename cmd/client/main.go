@@ -53,15 +53,14 @@ func main() {
 
 	// Send the command to run.
 	args, _ := config.Command()
-	toServer.Write(message.Run(args, config.Env(*j), terminal.WindowSize()))
+	toServer.Write(message.Run(args, config.Env(*j), terminal.Size()))
 
 	// Continue to send terminal size changes.
 	// These notifications are converted to look like terminal input so
 	// that they are not interleaved with other output when writing.
-	cleanup := terminal.OnResize(func() {
-		fromTerminal <- terminal.ResizeMessage()
+	terminal.OnResize(func(ws *terminal.WindowSize) {
+		fromTerminal <- message.Command(message.WindowSize(ws))
 	})
-	errors.AtExit(cleanup)
 
 	buf := buffer.New()
 

@@ -29,12 +29,16 @@ func Started() []byte {
 	})
 }
 
-func Status(code int) []byte {
-	return command("status", code)
+func Status(status int) []byte {
+	return command("status", status)
 }
 
-func Term(terminal string) []byte {
-	return command("term", terminal)
+func Term(term string) []byte {
+	return command("term", term)
+}
+
+func WindowSize(ws *pty.Winsize) []byte {
+	return command("ws", ws)
 }
 
 func command(key string, value interface{}) []byte {

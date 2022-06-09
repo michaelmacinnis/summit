@@ -236,8 +236,8 @@ func main() {
 		errors.AtExit(restore)
 
 		go session(id, c, toServer, statusq)
-		c <- message.New(message.Escape, message.Term(""))
-		c <- message.New(message.Escape, message.Run(args, os.Environ(), terminal.WindowSize()))
+		c <- message.Command(message.Term(""))
+		c <- message.Command(message.Run(args, os.Environ(), terminal.Size()))
 	}
 
 	routing := []*message.T{}

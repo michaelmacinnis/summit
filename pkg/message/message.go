@@ -44,6 +44,16 @@ type T struct {
 
 type message = T
 
+// Command creates a new Escape "command" message.
+func Command(raw []byte) *message {
+    c := &message{
+        cls: Escape,
+        raw: raw,
+    }
+
+    return c
+}
+
 // KV creates a new message from a map.
 func KV(kv map[string]interface{}) *message {
 	c := &message{
@@ -55,7 +65,7 @@ func KV(kv map[string]interface{}) *message {
 }
 
 func Log(format string, i ...interface{}) *message {
-	return New(Escape, command("log", fmt.Sprintf(format, i...)))
+	return Command(command("log", fmt.Sprintf(format, i...)))
 }
 
 // New creates a new message of unparsed bytes.

@@ -5,13 +5,13 @@ package terminal
 import (
 	"os"
 	"os/signal"
-	"syscall"
 
 	"github.com/creack/pty"
+	"golang.org/x/sys/unix"
 	"golang.org/x/term"
-
-	"github.com/michaelmacinnis/summit/pkg/message"
 )
+
+type WindowSize = pty.Winsize
 
 func IsTTY() bool {
 	return term.IsTerminal(int(stdin.Fd()))
@@ -27,12 +27,12 @@ func MakeRaw() (func() error, error) {
 	}, err
 }
 
-func OnResize(f func()) func() error {
-	signal.Notify(signals, syscall.SIGWINCH)
+func OnResize(f func(ws *WindowSize)) func() error {
+	signal.Notify(signals, unix.SIGWINCH)
 
 	go func() {
 		for range signals {
-			f()
+			f(Size())
 		}
 	}()
 
@@ -44,18 +44,11 @@ func OnResize(f func()) func() error {
 	}
 }
 
-func ResizeMessage() *message.T {
-	return message.KV(map[string]interface{}{
-		"cmd": "ws",
-		"ws":  WindowSize(),
-	})
-}
-
 func TriggerResize() {
-	signals <- syscall.SIGWINCH
+	signals <- unix.SIGWINCH
 }
 
-func WindowSize() *pty.Winsize {
+func Size() *WindowSize {
     ws, err := pty.GetsizeFull(stdin)
     if err != nil {
         println("error getting window size:", err.Error())
