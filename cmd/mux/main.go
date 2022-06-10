@@ -41,18 +41,17 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 	// First message should be the terminal for this session.
 	logf(out, "[%s] getting terminal id", id)
 
-	m := <-in
-	term := m.Term()
+	term := <-in
 
-	logf(out, "[%s] got terminal id %s:%s", id, m.Command(), term)
+	logf(out, "[%s] got terminal id %s:%s", id, term.Command(), term.Term())
 
 	// Second message should be the command, environment, and window size.
-	m = <-in
+	m := <-in
 	args := m.Args()
 	ws   := m.WindowSize()
 
 	logf(out, "[%s] sending new pty id", id)
-	out <- [][]byte{message.Term(term), message.Pty(id), message.Started()}
+	out <- [][]byte{term.Bytes(), message.Pty(id), message.Started()}
 
 	cmd := exec.Command(args[0], args[1:]...) //nolint:gosec
 
@@ -63,7 +62,7 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 
 	// Always send a status message on completion.
 	defer func() {
-		statusq <- Status{id, cmd.ProcessState.ExitCode(), term}
+		statusq <- Status{id, cmd.ProcessState.ExitCode(), term.Term()}
 	}()
 
 	f, err := pty.Start(cmd)
@@ -124,7 +123,7 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 	}()
 
 	go func() {
-		buffered := [][]byte{message.Term(term), message.Pty(id)}
+		buffered := [][]byte{term.Bytes(), message.Pty(id)}
 
 		sent := false
 
@@ -137,7 +136,7 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 				}
 
 				if sent {
-					buffered = [][]byte{message.Term(term), message.Pty(id)}
+					buffered = [][]byte{term.Bytes(), message.Pty(id)}
 
 					sent = false
 				}
