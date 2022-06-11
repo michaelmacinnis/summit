@@ -46,12 +46,12 @@ type message = T
 
 // Command creates a new Escape "command" message.
 func Command(raw []byte) *message {
-    c := &message{
-        cls: Escape,
-        raw: raw,
-    }
+	c := &message{
+		cls: Escape,
+		raw: raw,
+	}
 
-    return c
+	return c
 }
 
 // KV creates a new message from a map.

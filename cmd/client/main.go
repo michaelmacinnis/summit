@@ -79,7 +79,8 @@ func main() {
 
 	buf := buffer.New()
 
-	for buf.Message(<-fromServer) {}
+	for buf.Message(<-fromServer) {
+	}
 
 	newline := false
 

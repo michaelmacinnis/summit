@@ -48,7 +48,7 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 	// Second message should be the command, environment, and window size.
 	m := <-in
 	args := m.Args()
-	ws   := m.WindowSize()
+	ws := m.WindowSize()
 
 	logf(out, "[%s] sending new pty id", id)
 	out <- [][]byte{term.Bytes(), message.Pty(id), message.Started()}

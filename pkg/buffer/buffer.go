@@ -58,7 +58,7 @@ func (b *buffer) Message(m *message.T) bool {
 
 	if !b.completed {
 		b.routing = b.buffer
-		b.buffer  = bytes(b.prefix)
+		b.buffer = bytes(b.prefix)
 	}
 
 	b.completed = !m.IsStatus()

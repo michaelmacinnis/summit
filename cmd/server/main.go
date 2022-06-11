@@ -184,7 +184,7 @@ func terminal(id string, conn net.Conn, fromMux <-chan *message.T, toMux chan []
 	}
 
 	println("sending response to client")
-	
+
 	toClient <- append(src.Routing(), m.Bytes())
 
 	for {
