@@ -11,7 +11,22 @@ import (
 	"golang.org/x/term"
 )
 
-type WindowSize = pty.Winsize
+type Size = pty.Winsize
+
+var (
+	SetSize = pty.Setsize
+	Start   = pty.Start
+)
+
+func GetSize() *Size {
+	ts, err := pty.GetsizeFull(stdin)
+	if err != nil {
+		println("error getting window size:", err.Error())
+		return nil
+	}
+
+	return ts
+}
 
 func IsTTY() bool {
 	return term.IsTerminal(int(stdin.Fd()))
@@ -27,12 +42,14 @@ func MakeRaw() (func() error, error) {
 	}, err
 }
 
-func OnResize(f func(ws *WindowSize)) func() error {
+func OnResize(f func(ts *Size)) func() error {
+	signals := make(chan os.Signal, 1)
+
 	signal.Notify(signals, unix.SIGWINCH)
 
 	go func() {
 		for range signals {
-			f(Size())
+			f(GetSize())
 		}
 	}()
 
@@ -44,21 +61,4 @@ func OnResize(f func(ws *WindowSize)) func() error {
 	}
 }
 
-func TriggerResize() {
-	signals <- unix.SIGWINCH
-}
-
-func Size() *WindowSize {
-	ws, err := pty.GetsizeFull(stdin)
-	if err != nil {
-		println("error getting window size:", err.Error())
-		return nil
-	}
-
-	return ws
-}
-
-var (
-	signals = make(chan os.Signal, 1)
-	stdin   = os.Stdin
-)
+var stdin = os.Stdin

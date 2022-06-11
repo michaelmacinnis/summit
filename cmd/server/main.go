@@ -166,7 +166,7 @@ func terminal(id string, conn net.Conn, fromMux <-chan *message.T, toMux chan []
 	dst := buffer.New(term)
 
 	m := <-fromClient
-	for dst.Message(m) {
+	for dst.Buffered(m) {
 		m = <-fromClient
 	}
 
@@ -179,7 +179,7 @@ func terminal(id string, conn net.Conn, fromMux <-chan *message.T, toMux chan []
 	src := buffer.New()
 
 	m = <-fromMux
-	for src.Message(m) {
+	for src.Buffered(m) {
 		m = <-fromMux
 	}
 
@@ -195,7 +195,7 @@ func terminal(id string, conn net.Conn, fromMux <-chan *message.T, toMux chan []
 				goto done
 			}
 
-			if dst.Message(m) {
+			if dst.Buffered(m) {
 				continue
 			}
 
@@ -208,7 +208,7 @@ func terminal(id string, conn net.Conn, fromMux <-chan *message.T, toMux chan []
 				goto done
 			}
 
-			if src.Message(m) {
+			if src.Buffered(m) {
 				continue
 			}
 

@@ -4,7 +4,7 @@
 package message
 
 import (
-	"github.com/creack/pty"
+	"github.com/michaelmacinnis/summit/pkg/terminal"
 )
 
 func (m *message) Args() []string {
@@ -56,17 +56,17 @@ func (m *message) Term() string {
 	return str(m.Parsed(), "term")
 }
 
-func (m *message) WindowSize() *pty.Winsize {
-	ws := sub(m.Parsed(), "ws")
-	if ws == nil {
+func (m *message) TerminalSize() *terminal.Size {
+	ts := sub(m.Parsed(), "ts")
+	if ts == nil {
 		return nil
 	}
 
-	return &pty.Winsize{
-		Rows: u16(ws, "Rows"),
-		Cols: u16(ws, "Cols"),
-		X:    u16(ws, "X"),
-		Y:    u16(ws, "Y"),
+	return &terminal.Size{
+		Rows: u16(ts, "Rows"),
+		Cols: u16(ts, "Cols"),
+		X:    u16(ts, "X"),
+		Y:    u16(ts, "Y"),
 	}
 }
 

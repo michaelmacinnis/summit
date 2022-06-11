@@ -11,7 +11,6 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/creack/pty"
 	"github.com/michaelmacinnis/summit/pkg/buffer"
 	"github.com/michaelmacinnis/summit/pkg/comms"
 	"github.com/michaelmacinnis/summit/pkg/config"
@@ -48,7 +47,7 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 	// Second message should be the command, environment, and window size.
 	m := <-in
 	args := m.Args()
-	ws := m.WindowSize()
+	ts := m.TerminalSize()
 
 	logf(out, "[%s] sending new pty id", id)
 	out <- [][]byte{term.Bytes(), message.Pty(id), message.Started()}
@@ -65,7 +64,7 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 		statusq <- Status{id, cmd.ProcessState.ExitCode(), term.Term()}
 	}()
 
-	f, err := pty.Start(cmd)
+	f, err := terminal.Start(cmd)
 	if err != nil {
 		logf(out, "[%s] error: launching: %s", id, err.Error())
 
@@ -76,8 +75,8 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 		_ = f.Close() // Best effort.
 	}()
 
-	if ws != nil {
-		if err := pty.Setsize(f, ws); err != nil {
+	if ts != nil {
+		if err := terminal.SetSize(f, ts); err != nil {
 			logf(out, "[%s] error: setting size: %s", id, err.Error())
 		}
 	}
@@ -91,15 +90,15 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 		buf := buffer.New(term)
 
 		for m := range fromTerminal {
-			if buf.Message(m) {
+			if buf.Buffered(m) {
 				continue
 			}
 
 			routing := buf.Routing()
 			if len(routing) == 1 && !m.IsRun() {
-				ws := m.WindowSize()
-				if ws != nil {
-					if err := pty.Setsize(f, ws); err != nil {
+				ts := m.TerminalSize()
+				if ts != nil {
+					if err := terminal.SetSize(f, ts); err != nil {
 						logf(out, "[%s] error: setting size: %s", id, err.Error())
 					}
 				} else {
@@ -126,7 +125,7 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 				atomic.AddInt32(&muxing, n)
 			}
 
-			if buf.Message(m) {
+			if buf.Buffered(m) {
 				continue
 			}
 
@@ -205,7 +204,7 @@ func main() {
 
 		go session(id, c, toServer, statusq)
 		c <- message.Command(message.Term(""))
-		c <- message.Command(message.Run(args, os.Environ(), terminal.Size()))
+		c <- message.Command(message.Run(args, os.Environ(), terminal.GetSize()))
 	}
 
 	routing := []*message.T{}

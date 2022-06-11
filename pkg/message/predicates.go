@@ -5,7 +5,7 @@ package message
 
 func (m *message) Configuration() bool {
 	// NOTE: This may be expanded to include other commands.
-	return m.Is(Escape) && m.Command() == "ws"
+	return m.Is(Escape) && m.Command() == "ts"
 }
 
 func (m *message) IsMux() bool {

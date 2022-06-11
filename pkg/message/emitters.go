@@ -3,7 +3,7 @@
 package message
 
 import (
-	"github.com/creack/pty"
+	"github.com/michaelmacinnis/summit/pkg/terminal"
 )
 
 func Mux(mux int) []byte {
@@ -14,12 +14,12 @@ func Pty(pty string) []byte {
 	return command("pty", pty)
 }
 
-func Run(cmd, env []string, ws *pty.Winsize) []byte {
+func Run(cmd, env []string, ts *terminal.Size) []byte {
 	return Serialize(map[string]interface{}{
 		"cmd": "run",
 		"env": env,
 		"run": cmd,
-		"ws":  ws,
+		"ts":  ts,
 	})
 }
 
@@ -37,8 +37,8 @@ func Term(term string) []byte {
 	return command("term", term)
 }
 
-func WindowSize(ws *pty.Winsize) []byte {
-	return command("ws", ws)
+func TerminalSize(ts *terminal.Size) []byte {
+	return command("ts", ts)
 }
 
 func command(key string, value interface{}) []byte {

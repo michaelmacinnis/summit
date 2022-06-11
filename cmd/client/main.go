@@ -30,7 +30,7 @@ func resize(w io.Writer, buf *buffer.T, n int) {
 		w.Write(b)
 	}
 
-	w.Write(message.WindowSize(terminal.Size()))
+	w.Write(message.TerminalSize(terminal.GetSize()))
 }
 
 func main() {
@@ -68,18 +68,18 @@ func main() {
 
 	// Send the command to run.
 	args, _ := config.Command()
-	toServer.Write(message.Run(args, config.Env(*j), terminal.Size()))
+	toServer.Write(message.Run(args, config.Env(*j), terminal.GetSize()))
 
 	// Continue to send terminal size changes.
 	// These notifications are converted to look like terminal input so
 	// that they are not interleaved with other output when writing.
-	terminal.OnResize(func(ws *terminal.WindowSize) {
-		fromTerminal <- message.Command(message.WindowSize(ws))
+	terminal.OnResize(func(ts *terminal.Size) {
+		fromTerminal <- message.Command(message.TerminalSize(ts))
 	})
 
 	buf := buffer.New()
 
-	for buf.Message(<-fromServer) {
+	for buf.Buffered(<-fromServer) {
 	}
 
 	newline := false
@@ -112,7 +112,7 @@ func main() {
 				continue
 			}
 
-			if buf.Message(m) {
+			if buf.Buffered(m) {
 				continue
 			}
 

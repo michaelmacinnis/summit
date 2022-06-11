@@ -33,7 +33,7 @@ func New(prefix ...*message.T) *buffer {
 	}
 }
 
-func (b *buffer) Message(m *message.T) bool {
+func (b *buffer) Buffered(m *message.T) bool {
 	b.Lock()
 	defer b.Unlock()
 
@@ -65,16 +65,6 @@ func (b *buffer) Message(m *message.T) bool {
 	b.buffering = false
 
 	return false
-}
-
-func (b *buffer) Remove() {
-	b.Lock()
-	defer b.Unlock()
-
-	sz := len(b.routing)
-	if sz > 0 {
-		b.routing = b.routing[:sz-1]
-	}
 }
 
 func (b *buffer) Routing() [][]byte {
