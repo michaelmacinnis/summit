@@ -50,18 +50,19 @@ func (b *Buffer) Message(m *message.T) bool {
 				}
 			}
 		}
-	} else {
-		if !b.completed {
-			b.completed = true
 
-			b.routing = b.buffer
-			b.buffer  = bytes(b.prefix)
-		}
-
-		b.buffering = false
+		return true
 	}
 
-	return b.buffering
+	if !b.completed {
+		b.routing = b.buffer
+		b.buffer  = bytes(b.prefix)
+	}
+
+	b.completed = !m.IsStatus()
+	b.buffering = false
+
+	return false
 }
 
 func (b *Buffer) Remove() {

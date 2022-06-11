@@ -109,8 +109,6 @@ func main() {
 					errors.Exit(m.Status())
 				}
 
-				buf.Remove()
-
 				terminal.TriggerResize()
 
 				continue

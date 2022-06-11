@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 
 	"github.com/creack/pty"
-//	"github.com/michaelmacinnis/summit/pkg/buffer"
+	"github.com/michaelmacinnis/summit/pkg/buffer"
 	"github.com/michaelmacinnis/summit/pkg/comms"
 	"github.com/michaelmacinnis/summit/pkg/config"
 	"github.com/michaelmacinnis/summit/pkg/errors"
@@ -123,9 +123,8 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 	}()
 
 	go func() {
-		buffered := [][]byte{term.Bytes(), message.Pty(id)}
-
-		sent := false
+		buf := buffer.New(term, message.Command(message.Pty(id)))
+		buf.IgnoreBlankTerm = true
 
 		for m := range fromProgram {
 			if m.Logging() {
@@ -139,28 +138,19 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 				atomic.AddInt32(&nested, n)
 			}
 
-			if m.Is(message.Escape) {
-				if sent {
-					buffered = [][]byte{term.Bytes(), message.Pty(id)}
-
-					sent = false
-				}
-
-				if m.Configuration() || m.Routing() {
-					terminal := m.Term()
-					if terminal != "" {
-						buffered[0] = m.Bytes()
-					} else if m.Pty() != "" {
-						buffered = append(buffered, m.Bytes())
-					}
-
-					continue
-				}
+			if buf.Message(m) {
+				continue
 			}
 
-			toTerminal <- append(buffered, m.Bytes())
+			bs := append(buf.Routing(), m.Bytes())
 
-			sent = true
+			for _, b := range bs {
+				logf(toTerminal, "%s", strconv.Quote(string(b)))
+			}
+			logf(toTerminal, "END")
+
+			//toTerminal <- append(buf.Routing(), m.Bytes())
+			toTerminal <- bs
 		}
 	}()
 
