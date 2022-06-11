@@ -128,13 +128,13 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 		sent := false
 
 		for m := range fromProgram {
+			if m.Logging() {
+				toTerminal <- [][]byte{m.Bytes()}
+
+				continue
+			}
+
 			if m.Is(message.Escape) {
-				if m.Logging() {
-					toTerminal <- [][]byte{m.Bytes()}
-
-					continue
-				}
-
 				if sent {
 					buffered = [][]byte{term.Bytes(), message.Pty(id)}
 

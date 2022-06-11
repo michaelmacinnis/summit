@@ -10,6 +10,8 @@ import (
 )
 
 type Buffer struct {
+	IgnoreBlankTerm bool
+
 	sync.RWMutex
 
 	prefix []*message.T
@@ -42,8 +44,10 @@ func (b *Buffer) Message(m *message.T) bool {
 		if m.IsPty() {
 			b.buffer = append(b.buffer, m.Bytes())
 		} else if m.IsTerm() {
-			if len(b.prefix) > 0 && b.prefix[0].IsTerm() {
-				b.buffer[0] = m.Bytes()
+			if m.Term() != "" || !b.IgnoreBlankTerm {
+				if len(b.prefix) > 0 && b.prefix[0].IsTerm() {
+					b.buffer[0] = m.Bytes()
+				}
 			}
 		}
 	} else {
