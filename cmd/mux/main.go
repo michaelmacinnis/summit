@@ -135,15 +135,15 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 			}
 
 			if m.Is(message.Escape) {
+				if n := int32(m.Mux()); n != 0 {
+					atomic.AddInt32(&muxing, n)
+					atomic.AddInt32(&nested, n)
+				}
+
 				if sent {
 					buffered = [][]byte{term.Bytes(), message.Pty(id)}
 
 					sent = false
-				}
-
-				if n := int32(m.Mux()); n != 0 {
-					atomic.AddInt32(&muxing, n)
-					atomic.AddInt32(&nested, n)
 				}
 
 				if m.Configuration() || m.Routing() {
