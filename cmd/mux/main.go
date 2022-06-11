@@ -134,12 +134,12 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 				continue
 			}
 
-			if m.Is(message.Escape) {
-				if n := int32(m.Mux()); n != 0 {
-					atomic.AddInt32(&muxing, n)
-					atomic.AddInt32(&nested, n)
-				}
+			if n := int32(m.Mux()); n != 0 {
+				atomic.AddInt32(&muxing, n)
+				atomic.AddInt32(&nested, n)
+			}
 
+			if m.Is(message.Escape) {
 				if sent {
 					buffered = [][]byte{term.Bytes(), message.Pty(id)}
 
