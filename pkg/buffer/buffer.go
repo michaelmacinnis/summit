@@ -9,7 +9,7 @@ import (
 	"github.com/michaelmacinnis/summit/pkg/message"
 )
 
-type Buffer struct {
+type T struct {
 	IgnoreBlankTerm bool
 
 	sync.RWMutex
@@ -23,15 +23,17 @@ type Buffer struct {
 	routing [][]byte
 }
 
-func New(prefix ...*message.T) *Buffer {
-	return &Buffer{
+type buffer = T
+
+func New(prefix ...*message.T) *buffer {
+	return &buffer{
 		buffer:  bytes(prefix),
 		prefix:  prefix,
 		routing: bytes(prefix),
 	}
 }
 
-func (b *Buffer) Message(m *message.T) bool {
+func (b *buffer) Message(m *message.T) bool {
 	b.Lock()
 	defer b.Unlock()
 
@@ -65,7 +67,7 @@ func (b *Buffer) Message(m *message.T) bool {
 	return false
 }
 
-func (b *Buffer) Remove() {
+func (b *buffer) Remove() {
 	b.Lock()
 	defer b.Unlock()
 
@@ -75,7 +77,7 @@ func (b *Buffer) Remove() {
 	}
 }
 
-func (b *Buffer) Routing() [][]byte {
+func (b *buffer) Routing() [][]byte {
 	b.RLock()
 	defer b.RUnlock()
 

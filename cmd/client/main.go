@@ -18,6 +18,21 @@ import (
 	"github.com/michaelmacinnis/summit/pkg/terminal"
 )
 
+func resize(w io.Writer, buf *buffer.T, n int) {
+	routing := buf.Routing()
+
+	size := len(routing) + n
+	if size <= 0 {
+		return
+	}
+
+	for _, b := range routing[:size] {
+		w.Write(b)
+	}
+
+	w.Write(message.WindowSize(terminal.Size()))
+}
+
 func main() {
 	defer errors.Exit(0)
 
@@ -101,7 +116,7 @@ func main() {
 			}
 
 			if m.IsStarted() {
-				terminal.TriggerResize()
+				resize(toServer, buf, 0)
 
 				continue
 			} else if m.IsStatus() {
@@ -109,7 +124,7 @@ func main() {
 					errors.Exit(m.Status())
 				}
 
-				terminal.TriggerResize()
+				resize(toServer, buf, -1)
 
 				continue
 			}

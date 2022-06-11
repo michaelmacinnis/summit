@@ -87,38 +87,27 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 	toProgram := comms.Write(f)
 	toTerminal := out
 
-	nested := int32(0)
-
 	go func() {
-		buffered := [][]byte{}
+		buf := buffer.New(term)
 
 		for m := range fromTerminal {
-			var ws *pty.Winsize
+			if buf.Message(m) {
+				continue
+			}
 
-			if m.Is(message.Escape) {
-				if m.Configuration() || m.Routing() {
-					ws = m.WindowSize()
-					if ws != nil {
-						if err := pty.Setsize(f, ws); err != nil {
-							logf(out, "[%s] error: setting size: %s", id, err.Error())
-						}
+			routing := buf.Routing()
+			if len(routing) == 1 && !m.IsRun() {
+				ws := m.WindowSize()
+				if ws != nil {
+					if err := pty.Setsize(f, ws); err != nil {
+						logf(out, "[%s] error: setting size: %s", id, err.Error())
 					}
-
-					buffered = append(buffered, m.Bytes())
+				} else {
+					toProgram <- [][]byte{m.Bytes()}
 				}
-
-				if !m.IsRun() {
-					continue
-				}
+			} else {
+				toProgram <- append(routing, m.Bytes())
 			}
-
-			if atomic.LoadInt32(&nested) > 0 {
-				toProgram <- append(buffered, m.Bytes())
-			} else if ws == nil {
-				toProgram <- [][]byte{m.Bytes()}
-			}
-
-			buffered = [][]byte{}
 		}
 	}()
 
@@ -135,22 +124,13 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 
 			if n := int32(m.Mux()); n != 0 {
 				atomic.AddInt32(&muxing, n)
-				atomic.AddInt32(&nested, n)
 			}
 
 			if buf.Message(m) {
 				continue
 			}
 
-			bs := append(buf.Routing(), m.Bytes())
-
-			for _, b := range bs {
-				logf(toTerminal, "%s", strconv.Quote(string(b)))
-			}
-			logf(toTerminal, "END")
-
-			//toTerminal <- append(buf.Routing(), m.Bytes())
-			toTerminal <- bs
+			toTerminal <- append(buf.Routing(), m.Bytes())
 		}
 	}()
 
@@ -215,7 +195,6 @@ func main() {
 	if terminal.IsTTY() {
 		println("launching", fmt.Sprintf("%v", args))
 
-		// TODO: Launch as shim.
 		c := make(chan *message.T)
 		stream[id] = c
 
