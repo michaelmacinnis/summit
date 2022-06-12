@@ -8,10 +8,6 @@ func (m *message) Configuration() bool {
 	return m.Is(Escape) && m.Command() == "ts"
 }
 
-func (m *message) IsMux() bool {
-	return m.Is(Escape) && m.Command() == "mux"
-}
-
 func (m *message) IsPty() bool {
 	return m.Is(Escape) && m.Command() == "pty"
 }
@@ -42,7 +38,7 @@ func (m *message) Meta() bool {
 	}
 
 	cmd := m.Command()
-	return cmd == "mux" || cmd == "run" || cmd == "status"
+	return cmd == "run" || cmd == "started" || cmd == "status"
 }
 
 func (m *message) Routing() bool {

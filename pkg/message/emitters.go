@@ -6,10 +6,6 @@ import (
 	"github.com/michaelmacinnis/summit/pkg/terminal"
 )
 
-func Mux(mux int) []byte {
-	return command("mux", mux)
-}
-
 func Pty(pty string) []byte {
 	return command("pty", pty)
 }

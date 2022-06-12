@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 	"sync/atomic"
 
@@ -59,9 +58,11 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 
 	logf(out, "[%s] launching %#v (%#v)", id, args, cmd.Env)
 
+	actual := term
+
 	// Always send a status message on completion.
 	defer func() {
-		statusq <- Status{id, cmd.ProcessState.ExitCode(), term.Term()}
+		statusq <- Status{id, cmd.ProcessState.ExitCode(), actual.Term()}
 	}()
 
 	f, err := terminal.Start(cmd)
@@ -90,6 +91,10 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 		buf := buffer.New(term)
 
 		for m := range fromTerminal {
+			if m.IsTerm() {
+				actual = m
+			}
+
 			if buf.Buffered(m) {
 				continue
 			}
@@ -111,7 +116,7 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 	}()
 
 	go func() {
-		buf := buffer.New(term, message.Command(message.Pty(id)))
+		buf := buffer.New(term, message.Raw(message.Pty(id)))
 		buf.IgnoreBlankTerm = true
 
 		for m := range fromProgram {
@@ -121,15 +126,24 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 				continue
 			}
 
-			if n := int32(m.Mux()); n != 0 {
-				atomic.AddInt32(&muxing, n)
-			}
-
 			if buf.Buffered(m) {
 				continue
 			}
 
-			toTerminal <- append(buf.Routing(), m.Bytes())
+			if m.IsStarted() {
+				atomic.AddInt32(&muxing, 1)
+			} else if m.IsStatus() {
+				atomic.AddInt32(&muxing, -1)
+			}
+
+			bs := append(buf.Routing(), m.Bytes())
+			logf(toTerminal, "mux sent {")
+			for _, b := range bs {
+				logf(toTerminal, "mux sent: %s", message.Raw(b))
+			}
+			logf(toTerminal, "}")
+
+			toTerminal <- bs
 		}
 	}()
 
@@ -175,15 +189,13 @@ func main() {
 	stream := map[string]chan *message.T{}
 	term := ""
 
+	done := make(chan struct{})
 	next := comms.Counter(1)
 
 	fromServer := comms.Chunk(os.Stdin)
-	toServer := comms.Write(os.Stdout)
+	toServer := comms.Write(os.Stdout, done)
 
-	toServer <- [][]byte{message.Mux(1)}
 	defer func() {
-		toServer <- [][]byte{message.Mux(-1)}
-
 		errors.Exit(status)
 	}()
 
@@ -203,8 +215,8 @@ func main() {
 		errors.AtExit(restore)
 
 		go session(id, c, toServer, statusq)
-		c <- message.Command(message.Term(""))
-		c <- message.Command(message.Run(args, os.Environ(), terminal.GetSize()))
+		c <- message.Raw(message.Term(""))
+		c <- message.Raw(message.Run(args, os.Environ(), terminal.GetSize()))
 	}
 
 	routing := []*message.T{}
@@ -218,9 +230,9 @@ func main() {
 				return
 			}
 
-			if m.Is(message.Escape) {
-				logf(toServer, "mux command: %v", m.Parsed())
+			logf(toServer, "mux recv: %s", m)
 
+			if m.Is(message.Escape) {
 				switch {
 				case m.IsPty():
 					if selected == nil {
@@ -245,13 +257,8 @@ func main() {
 						stream[id] = selected
 
 						go session(id, selected, toServer, statusq)
-
-						// Send resize message first.
-						// selected <- <-fromServer
 					}
 				}
-			} else {
-				logf(toServer, "mux received: %v", strconv.Quote(string(m.Bytes())))
 			}
 
 			if selected == nil {
@@ -273,15 +280,17 @@ func main() {
 			close(stream[s.pty])
 			delete(stream, s.pty)
 
+			logf(toServer, "status len(stream)=%d, muxing=%d, term='%s', pty='%s', rv=%d", len(stream), atomic.LoadInt32(&muxing), s.term, s.pty, s.rv)
+
 			if s.pty == "0" {
 				status = s.rv
 				term = s.term
-			}
-
-			toServer <- [][]byte{
-				message.Term(s.term),
-				message.Pty(s.pty),
-				message.Status(s.rv),
+			} else {
+				toServer <- [][]byte{
+					message.Term(s.term),
+					message.Pty(s.pty),
+					message.Status(s.rv),
+				}
 			}
 
 			if len(stream) == 0 && atomic.LoadInt32(&muxing) == 0 {
@@ -292,6 +301,9 @@ func main() {
 						message.Status(status),
 					}
 				}
+
+				close(toServer)
+				<-done
 
 				return
 			}

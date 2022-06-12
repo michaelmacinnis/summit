@@ -53,7 +53,7 @@ func address(offset int, bs [][]byte) (string, string) {
 
 	term := ""
 	for _, b := range bs {
-		m := message.Command(b)
+		m := message.Raw(b)
 		switch {
 		case m.IsPty():
 			path[n] = m.Pty()
@@ -159,7 +159,7 @@ func terminal(id string, conn net.Conn, fromMux <-chan *message.T, toMux chan []
 	fromClient := comms.Chunk(conn)
 	toClient := comms.Write(conn)
 
-	term := message.Command(message.Term(id))
+	term := message.Raw(message.Term(id))
 
 	println("getting request from client")
 

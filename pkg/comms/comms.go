@@ -85,7 +85,7 @@ func Chunk(r io.Reader) chan *message.T {
 	return c
 }
 
-func Write(wc io.WriteCloser) chan [][]byte {
+func Write(wc io.WriteCloser, ds ...chan struct{}) chan [][]byte {
 	c := make(chan [][]byte)
 
 	go func() {
@@ -100,6 +100,10 @@ func Write(wc io.WriteCloser) chan [][]byte {
 					}
 				}
 			}
+		}
+
+		for _, d := range ds {
+			close(d)
 		}
 	}()
 

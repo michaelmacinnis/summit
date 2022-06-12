@@ -36,8 +36,6 @@ func resize(w io.Writer, buf *buffer.T, n int) {
 func main() {
 	defer errors.Exit(0)
 
-	muxing := int32(0)
-
 	j := flag.String("e", "", "environment (as a JSON array)")
 	path := flag.String("p", "", "routing path")
 	config.Parse()
@@ -74,15 +72,17 @@ func main() {
 	// These notifications are converted to look like terminal input so
 	// that they are not interleaved with other output when writing.
 	terminal.OnResize(func(ts *terminal.Size) {
-		fromTerminal <- message.Command(message.TerminalSize(ts))
+		fromTerminal <- message.Raw(message.TerminalSize(ts))
 	})
 
 	buf := buffer.New()
 
+	// Wait for started message.
 	for buf.Buffered(<-fromServer) {
 	}
 
 	newline := false
+	running := 1
 
 	for {
 		var f io.Writer
@@ -106,22 +106,20 @@ func main() {
 				goto done
 			}
 
-			if n := int32(m.Mux()); n != 0 {
-				muxing += n
-
-				continue
-			}
-
 			if buf.Buffered(m) {
 				continue
 			}
 
 			if m.IsStarted() {
+				running++
+
 				resize(toServer, buf, 0)
 
 				continue
 			} else if m.IsStatus() {
-				if muxing == 0 {
+				running--
+
+				if running == 0 {
 					errors.Exit(m.Status())
 				}
 

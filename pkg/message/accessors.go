@@ -40,10 +40,6 @@ func (m *message) Log() string {
 	return str(m.Parsed(), "log")
 }
 
-func (m *message) Mux() int {
-	return int(num(m.Parsed(), "mux"))
-}
-
 func (m *message) Pty() string {
 	return str(m.Parsed(), "pty")
 }

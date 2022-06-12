@@ -78,6 +78,24 @@ func New(cls Class, raw []byte) *message {
 	return c
 }
 
+// Raw creates a message from raw bytes.
+func Raw(raw []byte) *message {
+	kv := Deserialize(raw)
+
+	cls := Text
+	if kv != nil {
+		cls = Escape
+	}
+
+	c := &message{
+		cls: cls,
+		raw: raw,
+		kv:  kv,
+	}
+
+	return c
+}
+
 // Bytes returns the message's raw bytes.
 func (m *message) Bytes() []byte {
 	if m.raw == nil && m.kv != nil && m.Is(Escape) {
@@ -111,5 +129,20 @@ func (m *message) Parsed() map[string]interface{} {
 
 // String returns the message's string representation. Useful for debugging.
 func (m *message) String() string {
-	return "(" + m.cls.String() + ": " + strconv.Quote(string(m.raw)) + ")"
+	cls := m.cls
+
+	kv := m.kv
+	if kv == nil {
+		kv = Deserialize(m.raw)
+	}
+
+	s := strconv.Quote(string(m.raw))
+	if kv != nil {
+		cls = Escape
+		s = fmt.Sprintf("%v", kv)
+	} else {
+		cls = Text
+	}
+
+	return "(" + cls.String() + ": " + s + ")"
 }
