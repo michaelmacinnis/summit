@@ -6,11 +6,6 @@ import (
 	"os"
 )
 
-var (
-	command = Get("SUMMIT_COMMAND", Get("SHELL", "/bin/bash"))
-	socket  = Get("SUMMIT_SOCKET", "/tmp/summit.socket")
-)
-
 func Command() ([]string, bool) {
 	args := flag.Args()
 	if len(args) > 0 {
@@ -51,3 +46,8 @@ func Parse() {
 func Socket() string {
 	return socket
 }
+
+var (
+	command = Get("SUMMIT_COMMAND", Get("SHELL", "/bin/bash"))
+	socket  = Get("SUMMIT_SOCKET", "/tmp/summit.socket")
+)

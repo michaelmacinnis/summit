@@ -61,8 +61,8 @@ func (b *buffer) Buffered(m *message.T) bool {
 		b.buffer = bytes(b.prefix)
 	}
 
-	b.completed = !m.IsStatus()
 	b.buffering = false
+	b.completed = !m.IsStatus()
 
 	return false
 }
