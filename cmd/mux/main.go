@@ -64,11 +64,9 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan *Sta
 
 	logf(out, "[%s] launching %#v (%#v)", id, args, cmd.Env)
 
-	actual := term
-
 	// Always send a status message on completion.
 	defer func() {
-		statusq <- &Status{0, id, cmd.ProcessState.ExitCode(), actual.Term()}
+		statusq <- &Status{0, id, cmd.ProcessState.ExitCode(), term.Term()}
 	}()
 
 	f, err := terminal.Start(cmd)
@@ -97,10 +95,6 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan *Sta
 		buf := buffer.New(term)
 
 		for m := range fromTerminal {
-			if m.IsTerm() {
-				actual = m
-			}
-
 			if buf.Buffered(m) {
 				continue
 			}
@@ -173,7 +167,7 @@ func main() {
 		f := flag.CommandLine.Output()
 		fmt.Fprintf(f, "%s\n\nUsage:\n", os.Args[0])
 		fmt.Fprintf(f, "  %s [-l LABEL] COMMAND ARGUMENTS...\n", os.Args[0])
-		fmt.Fprintf(f, "  %s -n\n\n", os.Args[0])
+		fmt.Fprintf(f, "  %s -n COMMAND ARGUMENTS...\n\n", os.Args[0])
 		flag.PrintDefaults()
 	}
 
@@ -193,6 +187,7 @@ func main() {
 	}
 
 	stream := map[string]chan *message.T{}
+	saved := false
 	term := ""
 
 	done := make(chan struct{})
@@ -298,6 +293,7 @@ func main() {
 			delete(stream, s.pty)
 
 			if s.pty == "0" {
+				saved = true
 				status = s.rv
 				term = s.term
 			} else {
@@ -309,7 +305,7 @@ func main() {
 			}
 
 			if nested == 0 && len(stream) == 0 {
-				if term != "" {
+				if saved {
 					toServer <- [][]byte{
 						message.Term(term),
 						message.Pty("0"),
