@@ -14,8 +14,6 @@ type Class rune
 
 // Message classes.
 const (
-	Error Class = iota
-
 	End Class = unicode.MaxRune + iota
 	Command
 	Text
@@ -24,10 +22,10 @@ const (
 // String returns a string representation of Class. Useful for debugging.
 func (c *Class) String() string {
 	switch *c {
-	case Error:
-		return "error"
 	case Command:
 		return "command"
+	case End:
+		return "end"
 	case Text:
 		return "text"
 	}

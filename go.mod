@@ -1,6 +1,6 @@
 module github.com/michaelmacinnis/summit
 
-go 1.16
+go 1.18
 
 require (
 	github.com/creack/pty v1.1.17 // indirect

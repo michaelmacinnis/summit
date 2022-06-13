@@ -12,7 +12,7 @@ func (m *message) Args() (args []string) {
 }
 
 func (m *message) Command() string {
-	return str(m.Parsed(), "cmd")
+	return field[string](m, "cmd")
 }
 
 func (m *message) Env() (env []string) {
@@ -20,77 +20,61 @@ func (m *message) Env() (env []string) {
 }
 
 func (m *message) Log() string {
-	return str(m.Parsed(), "log")
+	return field[string](m, "log")
 }
 
 func (m *message) Pty() string {
-	return str(m.Parsed(), "pty")
+	return field[string](m, "pty")
 }
 
 func (m *message) Status() int {
-	return int(num(m.Parsed(), "status"))
+	return int(field[float64](m, "status"))
 }
 
 func (m *message) Term() string {
-	return str(m.Parsed(), "term")
+	return field[string](m, "term")
 }
 
 func (m *message) TerminalSize() *terminal.Size {
-	ts := sub(m.Parsed(), "ts")
+	ts := field[map[string]interface{}](m, "ts")
 	if ts == nil {
 		return nil
 	}
 
 	return &terminal.Size{
-		Rows: u16(ts, "Rows"),
-		Cols: u16(ts, "Cols"),
-		X:    u16(ts, "X"),
-		Y:    u16(ts, "Y"),
+		Rows: u16(ts["Rows"]),
+		Cols: u16(ts["Cols"]),
+		X:    u16(ts["X"]),
+		Y:    u16(ts["Y"]),
 	}
 }
 
-func (m *message) strings(field string) (elems []string) {
-	if a, ok := value(m.Parsed(), field).([]interface{}); ok {
-		elems = make([]string, len(a))
+func (m *message) strings(k string) (elems []string) {
+	a := field[[]any](m, k)
 
-		for k, v := range a {
-			elems[k] = v.(string)
-		}
+	elems = make([]string, len(a))
+
+	for k, v := range a {
+		elems[k] = v.(string)
 	}
 
 	return
 }
 
-func num(m map[string]interface{}, k string) float64 {
-	v := value(m, k)
-	if n, ok := v.(float64); ok {
+func cast[T any](v any) T {
+	var zero T
+
+	if n, ok := v.(T); ok {
 		return n
 	}
 
-	return 0
+	return zero
 }
 
-func str(m map[string]interface{}, k string) string {
-	if s, ok := value(m, k).(string); ok {
-		return s
-	}
-
-	return ""
+func field[T any](m *message, k string) T {
+	return cast[T](m.Parsed()[k])
 }
 
-func sub(m map[string]interface{}, k string) map[string]interface{} {
-	v := value(m, k)
-	if m, ok := v.(map[string]interface{}); ok {
-		return m
-	}
-
-	return nil
-}
-
-func u16(m map[string]interface{}, k string) uint16 {
-	return uint16(num(m, k))
-}
-
-func value(m map[string]interface{}, k string) interface{} {
-	return m[k]
+func u16(v any) uint16 {
+	return uint16(cast[float64](v))
 }
