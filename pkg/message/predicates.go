@@ -3,49 +3,42 @@
 // Package message encapsulates the units emitted by the lexer.
 package message
 
-func (m *message) Configuration() bool {
-	// NOTE: This may be expanded to include other commands.
-	return m.Is(Command) && m.Command() == "ts"
-}
-
 func (m *message) IsPty() bool {
-	return m.Is(Command) && m.Command() == "pty"
+	return is(m, "pty")
 }
 
 func (m *message) IsRun() bool {
-	return m.Is(Command) && m.Command() == "run"
+	return is(m, "run")
 }
 
 func (m *message) IsStarted() bool {
-	return m.Is(Command) && m.Command() == "started"
+	return is(m, "started")
 }
 
 func (m *message) IsStatus() bool {
-	return m.Is(Command) && m.Command() == "status"
+	return is(m, "status")
 }
 
 func (m *message) IsTerm() bool {
-	return m.Is(Command) && m.Command() == "term"
+	return is(m, "term")
 }
 
 func (m *message) Logging() bool {
-	return m.Is(Command) && m.Command() == "log"
-}
-
-func (m *message) Meta() bool {
-	if !m.Is(Command) {
-		return false
-	}
-
-	cmd := m.Command()
-	return cmd == "run" || cmd == "started" || cmd == "status"
+	return is(m, "log")
 }
 
 func (m *message) Routing() bool {
-	if !m.Is(Command) {
-		return false
+	return is(m, "pty", "term")
+}
+
+func is(m *message, cmds ...string) bool {
+	s := m.Command()
+
+	for _, cmd := range cmds {
+		if s == cmd {
+			return true
+		}
 	}
 
-	cmd := m.Command()
-	return cmd == "pty" || cmd == "term"
+	return false
 }

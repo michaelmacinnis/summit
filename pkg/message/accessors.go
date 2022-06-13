@@ -7,16 +7,8 @@ import (
 	"github.com/michaelmacinnis/summit/pkg/terminal"
 )
 
-func (m *message) Args() []string {
-	var args []string
-	if a, ok := value(m.Parsed(), "run").([]interface{}); ok {
-		args = make([]string, len(a))
-		for k, v := range a {
-			args[k] = v.(string)
-		}
-	}
-
-	return args
+func (m *message) Args() (args []string) {
+	return m.strings("run")
 }
 
 func (m *message) Command() string {
@@ -24,16 +16,7 @@ func (m *message) Command() string {
 }
 
 func (m *message) Env() (env []string) {
-	if a, ok := value(m.Parsed(), "env").([]interface{}); ok {
-		env = make([]string, len(a))
-
-		for k, v := range a {
-			s := v.(string)
-			env[k] = s
-		}
-	}
-
-	return
+	return m.strings("env")
 }
 
 func (m *message) Log() string {
@@ -64,6 +47,18 @@ func (m *message) TerminalSize() *terminal.Size {
 		X:    u16(ts, "X"),
 		Y:    u16(ts, "Y"),
 	}
+}
+
+func (m *message) strings(field string) (elems []string) {
+	if a, ok := value(m.Parsed(), field).([]interface{}); ok {
+		elems = make([]string, len(a))
+
+		for k, v := range a {
+			elems[k] = v.(string)
+		}
+	}
+
+	return
 }
 
 func num(m map[string]interface{}, k string) float64 {
@@ -97,9 +92,5 @@ func u16(m map[string]interface{}, k string) uint16 {
 }
 
 func value(m map[string]interface{}, k string) interface{} {
-	if v, ok := m[k]; ok {
-		return v
-	}
-
-	return nil
+	return m[k]
 }
