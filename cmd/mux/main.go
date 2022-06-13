@@ -26,13 +26,16 @@ type Status struct {
 
 //nolint:gochecknoglobals
 var (
+	debug  = true
 	label  = "unknown"
 	nested = 0
 	status = 0
 )
 
 func logf(out chan [][]byte, format string, i ...interface{}) {
-	out <- [][]byte{message.Log(label+": "+format, i...).Bytes()}
+	if debug {
+		out <- [][]byte{message.Log(label+": "+format, i...).Bytes()}
+	}
 }
 
 func session(id string, in chan *message.T, out chan [][]byte, statusq chan *Status) {

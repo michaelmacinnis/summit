@@ -10,7 +10,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	//	"strconv"
 	"strings"
 
 	"github.com/michaelmacinnis/summit/pkg/buffer"
