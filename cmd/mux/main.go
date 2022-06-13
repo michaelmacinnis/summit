@@ -202,8 +202,8 @@ func main() {
 	toServer := comms.Write(os.Stdout, done)
 
 	defer func() {
-        close(toServer)
-        <-done
+		close(toServer)
+		<-done
 
 		errors.Exit(status)
 	}()
