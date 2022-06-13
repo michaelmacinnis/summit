@@ -75,7 +75,7 @@ func (l *T) emit(c message.Class, v []byte) {
 		return
 	}
 
-	if c == message.Escape && len(v) == 8 {
+	if c == message.Command && len(v) == 8 {
 		c = message.End
 	}
 
@@ -138,7 +138,7 @@ func afterCloseBraceDashEscape(l *T) action {
 		return nil
 	case '\\':
 		l.accept(r, w)
-		l.emit(message.Escape, l.text())
+		l.emit(message.Command, l.text())
 	}
 
 	return text

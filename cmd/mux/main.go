@@ -241,7 +241,7 @@ func main() {
 
 			logf(toServer, "mux recv: %s", m)
 
-			if m.Is(message.Escape) {
+			if m.Is(message.Command) {
 				switch {
 				case m.IsPty():
 					if selected == nil {

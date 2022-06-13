@@ -17,7 +17,7 @@ const (
 	Error Class = iota
 
 	End Class = unicode.MaxRune + iota
-	Escape
+	Command
 	Text
 )
 
@@ -26,8 +26,8 @@ func (c *Class) String() string {
 	switch *c {
 	case Error:
 		return "error"
-	case Escape:
-		return "escape"
+	case Command:
+		return "command"
 	case Text:
 		return "text"
 	}
@@ -64,7 +64,7 @@ func Raw(raw []byte) *message {
 
 	cls := Text
 	if kv != nil {
-		cls = Escape
+		cls = Command
 	}
 
 	c := &message{
@@ -78,7 +78,7 @@ func Raw(raw []byte) *message {
 
 // Bytes returns the message's raw bytes.
 func (m *message) Bytes() []byte {
-	if m.raw == nil && m.kv != nil && m.Is(Escape) {
+	if m.raw == nil && m.kv != nil && m.Is(Command) {
 		m.raw = Serialize(m.kv)
 	}
 	return m.raw
@@ -101,7 +101,7 @@ func (m *message) Is(cs ...Class) bool {
 
 // Parsed returns the message's parsed value.
 func (m *message) Parsed() map[string]interface{} {
-	if m.kv == nil && m.raw != nil && m.Is(Escape) {
+	if m.kv == nil && m.raw != nil && m.Is(Command) {
 		m.kv = Deserialize(m.raw)
 	}
 	return m.kv
@@ -118,7 +118,7 @@ func (m *message) String() string {
 
 	s := strconv.Quote(string(m.raw))
 	if kv != nil {
-		cls = Escape
+		cls = Command
 		s = fmt.Sprintf("%v", kv)
 	} else {
 		cls = Text

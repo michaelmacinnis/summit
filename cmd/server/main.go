@@ -96,7 +96,7 @@ func dispatch(accepted <-chan net.Conn, fromMux chan *message.T, toMux chan [][]
 				return
 			}
 
-			if m.Is(message.Escape) {
+			if m.Is(message.Command) {
 				if m.Logging() {
 					println("LOGGING:", m.Log())
 					continue

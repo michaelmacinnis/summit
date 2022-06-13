@@ -5,35 +5,35 @@ package message
 
 func (m *message) Configuration() bool {
 	// NOTE: This may be expanded to include other commands.
-	return m.Is(Escape) && m.Command() == "ts"
+	return m.Is(Command) && m.Command() == "ts"
 }
 
 func (m *message) IsPty() bool {
-	return m.Is(Escape) && m.Command() == "pty"
+	return m.Is(Command) && m.Command() == "pty"
 }
 
 func (m *message) IsRun() bool {
-	return m.Is(Escape) && m.Command() == "run"
+	return m.Is(Command) && m.Command() == "run"
 }
 
 func (m *message) IsStarted() bool {
-	return m.Is(Escape) && m.Command() == "started"
+	return m.Is(Command) && m.Command() == "started"
 }
 
 func (m *message) IsStatus() bool {
-	return m.Is(Escape) && m.Command() == "status"
+	return m.Is(Command) && m.Command() == "status"
 }
 
 func (m *message) IsTerm() bool {
-	return m.Is(Escape) && m.Command() == "term"
+	return m.Is(Command) && m.Command() == "term"
 }
 
 func (m *message) Logging() bool {
-	return m.Is(Escape) && m.Command() == "log"
+	return m.Is(Command) && m.Command() == "log"
 }
 
 func (m *message) Meta() bool {
-	if !m.Is(Escape) {
+	if !m.Is(Command) {
 		return false
 	}
 
@@ -42,7 +42,7 @@ func (m *message) Meta() bool {
 }
 
 func (m *message) Routing() bool {
-	if !m.Is(Escape) {
+	if !m.Is(Command) {
 		return false
 	}
 
