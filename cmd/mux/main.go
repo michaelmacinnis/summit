@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"sync/atomic"
 
 	"github.com/michaelmacinnis/summit/pkg/buffer"
 	"github.com/michaelmacinnis/summit/pkg/comms"
@@ -19,6 +18,7 @@ import (
 )
 
 type Status struct {
+	n    int
 	pty  string
 	rv   int
 	term string
@@ -27,7 +27,7 @@ type Status struct {
 //nolint:gochecknoglobals
 var (
 	label  = "unknown"
-	muxing = int32(0)
+	nested = 0
 	status = 0
 )
 
@@ -35,7 +35,7 @@ func logf(out chan [][]byte, format string, i ...interface{}) {
 	out <- [][]byte{message.Log(label+": "+format, i...).Bytes()}
 }
 
-func session(id string, in chan *message.T, out chan [][]byte, statusq chan Status) {
+func session(id string, in chan *message.T, out chan [][]byte, statusq chan *Status) {
 	// First message should be the terminal for this session.
 	logf(out, "[%s] getting terminal id", id)
 
@@ -48,6 +48,9 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 	args := m.Args()
 	ts := m.TerminalSize()
 
+	// TODO: When launched as a shim for a command that does not exist,
+	//       this triggers a resize message but this mux is not longer
+	//       here to receive it.
 	logf(out, "[%s] sending new pty id", id)
 	out <- [][]byte{term.Bytes(), message.Pty(id), message.Started()}
 
@@ -62,7 +65,7 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 
 	// Always send a status message on completion.
 	defer func() {
-		statusq <- Status{id, cmd.ProcessState.ExitCode(), actual.Term()}
+		statusq <- &Status{0, id, cmd.ProcessState.ExitCode(), actual.Term()}
 	}()
 
 	f, err := terminal.Start(cmd)
@@ -131,9 +134,9 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan Stat
 			}
 
 			if m.IsStarted() {
-				atomic.AddInt32(&muxing, 1)
+				statusq <- &Status{n: 1}
 			} else if m.IsStatus() {
-				atomic.AddInt32(&muxing, -1)
+				statusq <- &Status{n: -1}
 			}
 
 			bs := append(buf.Routing(), m.Bytes())
@@ -196,10 +199,13 @@ func main() {
 	toServer := comms.Write(os.Stdout, done)
 
 	defer func() {
+        close(toServer)
+        <-done
+
 		errors.Exit(status)
 	}()
 
-	statusq := make(chan Status) // Pty ID + exit status.
+	statusq := make(chan *Status) // Pty ID + exit status.
 
 	id := "0"
 
@@ -277,10 +283,16 @@ func main() {
 			selected = nil
 
 		case s := <-statusq:
+			logf(toServer, "status len(stream)=%d, nested=%d, n=%d, term='%s', pty='%s', rv=%d", len(stream), nested, s.n, s.term, s.pty, s.rv)
+
+			if s.n != 0 {
+				nested += s.n
+
+				continue
+			}
+
 			close(stream[s.pty])
 			delete(stream, s.pty)
-
-			logf(toServer, "status len(stream)=%d, muxing=%d, term='%s', pty='%s', rv=%d", len(stream), atomic.LoadInt32(&muxing), s.term, s.pty, s.rv)
 
 			if s.pty == "0" {
 				status = s.rv
@@ -293,7 +305,7 @@ func main() {
 				}
 			}
 
-			if len(stream) == 0 && atomic.LoadInt32(&muxing) == 0 {
+			if nested == 0 && len(stream) == 0 {
 				if term != "" {
 					toServer <- [][]byte{
 						message.Term(term),
@@ -301,9 +313,6 @@ func main() {
 						message.Status(status),
 					}
 				}
-
-				close(toServer)
-				<-done
 
 				return
 			}
