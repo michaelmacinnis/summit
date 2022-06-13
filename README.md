@@ -4,7 +4,7 @@
 
 - Build client, server and mux.
 - Put client and mux (locally) somewhere on your `$PATH` as summit-client and summit-mux.
-- Run the server (locally, passing -t and the path to the terminal emulator if not using kitty).
+- Run the server (locally, optionally passing -t and the path to a custom script that will launch a terminal and invoke the command passed as arguments).
 - Install summit-mux on any machine and in any container where you want to launch terminals.
 
 Instead of launching `$SHELL` locally (from a terminal emulator, for example), launch,
