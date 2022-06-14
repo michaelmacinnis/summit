@@ -66,7 +66,29 @@ func main() {
 
 	// Send the command to run.
 	args, _ := config.Command()
-	toServer.Write(message.Run(args, config.Env(*j), terminal.GetSize()))
+	toServer.Write(message.Run(args, config.Env(*j)))
+
+	buf := buffer.New()
+
+	// Wait for started message.
+	m := <-fromServer
+	for buf.Buffered(m) {
+		m = <-fromServer
+	}
+
+	if !m.IsStarted() {
+		s := "nil"
+		if m != nil {
+			s = m.String()
+		}
+
+		println("expected started message got", s)
+
+		return
+	}
+
+	// Send terminal size.
+	resize(toServer, buf, 0)
 
 	// Continue to send terminal size changes.
 	// These notifications are converted to look like terminal input so
@@ -74,12 +96,6 @@ func main() {
 	terminal.OnResize(func(ts *terminal.Size) {
 		fromTerminal <- message.Raw(message.TerminalSize(ts))
 	})
-
-	buf := buffer.New()
-
-	// Wait for started message.
-	for buf.Buffered(<-fromServer) {
-	}
 
 	newline := false
 	running := 1
@@ -110,21 +126,22 @@ func main() {
 				continue
 			}
 
-			if m.IsStarted() {
-				running++
+			if m.Is(message.Command) {
+				if m.IsStarted() {
+					running++
 
-				resize(toServer, buf, 0)
-
-				continue
-			} else if m.IsStatus() {
-				running--
-
-				if running == 0 {
-					errors.Exit(m.Status())
+					resize(toServer, buf, 0)
+				} else if m.IsStatus() {
+					running--
+	
+					if running == 0 {
+						errors.Exit(m.Status())
+					}
+	
+					resize(toServer, buf, -1)
 				}
 
-				resize(toServer, buf, -1)
-
+				// Unexpected message. Don't send to terminal.
 				continue
 			}
 

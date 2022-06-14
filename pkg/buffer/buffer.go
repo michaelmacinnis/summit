@@ -10,6 +10,7 @@ import (
 )
 
 type T struct {
+	// TODO: Can this just be the default?
 	IgnoreBlankTerm bool
 
 	sync.RWMutex
@@ -34,6 +35,10 @@ func New(prefix ...*message.T) *buffer {
 }
 
 func (b *buffer) Buffered(m *message.T) bool {
+	if m == nil {
+		return false
+	}
+
 	b.Lock()
 	defer b.Unlock()
 

@@ -14,8 +14,8 @@ import (
 type Size = pty.Winsize
 
 var (
-	SetSize = pty.Setsize
-	Start   = pty.Start
+	SetSize       = pty.Setsize
+	StartWithSize = pty.StartWithSize
 )
 
 func GetSize() *Size {

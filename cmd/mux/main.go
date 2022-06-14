@@ -12,7 +12,6 @@ import (
 	"github.com/michaelmacinnis/summit/pkg/buffer"
 	"github.com/michaelmacinnis/summit/pkg/comms"
 	"github.com/michaelmacinnis/summit/pkg/config"
-	"github.com/michaelmacinnis/summit/pkg/errors"
 	"github.com/michaelmacinnis/summit/pkg/message"
 	"github.com/michaelmacinnis/summit/pkg/terminal"
 )
@@ -28,8 +27,6 @@ type Status struct {
 var (
 	debug  = true
 	label  = "unknown"
-	nested = 0
-	status = 0
 )
 
 func logf(out chan [][]byte, format string, i ...interface{}) {
@@ -39,6 +36,13 @@ func logf(out chan [][]byte, format string, i ...interface{}) {
 }
 
 func session(id string, in chan *message.T, out chan [][]byte, statusq chan *Status) {
+	defer func() {
+		r := recover()
+		if r != nil {
+			println(fmt.Sprintf("unexpected error: %v", r))
+		}
+	}()
+
 	// First message should be the terminal for this session.
 	logf(out, "[%s] getting terminal id", id)
 
@@ -49,10 +53,9 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan *Sta
 	// Second message should be the command, environment, and window size.
 	m := <-in
 	args := m.Args()
-	ts := m.TerminalSize()
 
 	// TODO: When launched as a shim for a command that does not exist,
-	//       this triggers a resize message but this mux is not longer
+	//       this triggers a resize message but this mux is no longer
 	//       here to receive it.
 	logf(out, "[%s] sending new pty id", id)
 	out <- [][]byte{term.Bytes(), message.Pty(id), message.Started()}
@@ -62,6 +65,10 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan *Sta
 	cmd.Env = m.Env()
 	cmd.Dir = wd(cmd.Env)
 
+	// Third message should be the terminal size.
+	m = <-in
+	ts := m.TerminalSize()
+
 	logf(out, "[%s] launching %#v (%#v)", id, args, cmd.Env)
 
 	// Always send a status message on completion.
@@ -69,9 +76,12 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan *Sta
 		statusq <- &Status{0, id, cmd.ProcessState.ExitCode(), term.Term()}
 	}()
 
-	f, err := terminal.Start(cmd)
+	f, err := terminal.StartWithSize(cmd, ts)
 	if err != nil {
 		logf(out, "[%s] error: launching: %s", id, err.Error())
+		if id == "0" {
+			println(err.Error()+"\r")
+		}
 
 		return
 	}
@@ -79,12 +89,6 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan *Sta
 	defer func() {
 		_ = f.Close() // Best effort.
 	}()
-
-	if ts != nil {
-		if err := terminal.SetSize(f, ts); err != nil {
-			logf(out, "[%s] error: setting size: %s", id, err.Error())
-		}
-	}
 
 	fromProgram := comms.Chunk(f)
 	fromTerminal := in
@@ -115,7 +119,6 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan *Sta
 		}
 	}()
 
-	go func() {
 		buf := buffer.New(term, message.Raw(message.Pty(id)))
 		buf.IgnoreBlankTerm = true
 
@@ -145,7 +148,6 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan *Sta
 
 			toTerminal <- bs
 		}
-	}()
 
 	_ = cmd.Wait()
 }
@@ -178,54 +180,61 @@ func main() {
 	args, defaulted := config.Command()
 
 	if request {
-		os.Stdout.Write(message.Run(args, os.Environ(), nil))
+		os.Stdout.Write(message.Run(args, os.Environ()))
 		return
 	} else if defaulted && terminal.IsTTY() {
 		flag.Usage()
 
-		errors.Exit(1)
+		return
 	}
 
-	stream := map[string]chan *message.T{}
-	saved := false
-	term := ""
-
-	done := make(chan struct{})
-	next := comms.Counter(1)
-
+	done       := make(chan struct{})
 	fromServer := comms.Chunk(os.Stdin)
-	toServer := comms.Write(os.Stdout, done)
+	id         := ""
+	nested     := 0
+	next       := comms.Counter(1)
+	routing    := []*message.T{}
+	status     := (*Status)(nil)
+	statusq    := make(chan *Status, 1) // Pty ID + exit status.
+	stream     := map[string]chan *message.T{}
+	toServer   := comms.Write(os.Stdout, done)
 
 	defer func() {
+		rv := 0
+		if status != nil {
+			rv = status.rv
+
+			toServer <- [][]byte{
+				message.Term(status.term),
+				message.Pty(status.pty),
+				message.Status(rv),
+			}
+		}
+
 		close(toServer)
 		<-done
-
-		errors.Exit(status)
 	}()
 
-	statusq := make(chan *Status) // Pty ID + exit status.
-
-	id := "0"
-
 	if terminal.IsTTY() {
-		println("launching", fmt.Sprintf("%v", args))
+		id = "0"
 
 		c := make(chan *message.T)
 		stream[id] = c
 
 		restore, err := terminal.MakeRaw()
-		errors.On(err).Die("failed to put terminal in raw mode")
+		if err != nil {
+			println("failed to put terminal in raw mode")
 
-		errors.AtExit(restore)
+			return
+		}
+
+		defer restore()
 
 		go session(id, c, toServer, statusq)
 		c <- message.Raw(message.Term(""))
-		c <- message.Raw(message.Run(args, os.Environ(), terminal.GetSize()))
+		c <- message.Raw(message.Run(args, os.Environ()))
+		c <- message.Raw(message.TerminalSize(terminal.GetSize()))
 	}
-
-	routing := []*message.T{}
-
-	var selected chan *message.T
 
 	for {
 		select {
@@ -239,9 +248,8 @@ func main() {
 			if m.Is(message.Command) {
 				switch {
 				case m.IsPty():
-					if selected == nil {
+					if id == "" {
 						id = m.Pty()
-						selected = stream[id]
 					} else {
 						routing = append(routing, m)
 					}
@@ -249,27 +257,26 @@ func main() {
 					continue
 
 				case m.IsTerm():
+					id = ""
 					routing = []*message.T{m}
 
 					continue
 
 				case m.IsRun():
-					if selected == nil {
+					if id == "" {
 						id = <-next
-						selected = make(chan *message.T)
+						c := make(chan *message.T)
 
-						stream[id] = selected
+						stream[id] = c
 
-						go session(id, selected, toServer, statusq)
+						go session(id, c, toServer, statusq)
 					}
 				}
 			}
 
+			selected := stream[id]
 			if selected == nil {
-				selected = stream[id]
-				if selected == nil {
-					continue
-				}
+				continue
 			}
 
 			for _, b := range routing {
@@ -277,8 +284,6 @@ func main() {
 			}
 
 			selected <- m
-
-			selected = nil
 
 		case s := <-statusq:
 			logf(toServer, "status len(stream)=%d, nested=%d, n=%d, term='%s', pty='%s', rv=%d", len(stream), nested, s.n, s.term, s.pty, s.rv)
@@ -293,9 +298,7 @@ func main() {
 			delete(stream, s.pty)
 
 			if s.pty == "0" {
-				saved = true
-				status = s.rv
-				term = s.term
+				status = s
 			} else {
 				toServer <- [][]byte{
 					message.Term(s.term),
@@ -305,14 +308,6 @@ func main() {
 			}
 
 			if nested == 0 && len(stream) == 0 {
-				if saved {
-					toServer <- [][]byte{
-						message.Term(term),
-						message.Pty("0"),
-						message.Status(status),
-					}
-				}
-
 				return
 			}
 		}
