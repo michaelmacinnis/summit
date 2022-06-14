@@ -25,8 +25,8 @@ type Status struct {
 
 //nolint:gochecknoglobals
 var (
-	debug  = true
-	label  = "unknown"
+	debug = true
+	label = "unknown"
 )
 
 func logf(out chan [][]byte, format string, i ...interface{}) {
@@ -80,7 +80,7 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan *Sta
 	if err != nil {
 		logf(out, "[%s] error: launching: %s", id, err.Error())
 		if id == "0" {
-			println(err.Error()+"\r")
+			println(err.Error() + "\r")
 		}
 
 		return
@@ -119,35 +119,36 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan *Sta
 		}
 	}()
 
-		buf := buffer.New(term, message.Raw(message.Pty(id)))
-		buf.IgnoreBlankTerm = true
+	buf := buffer.New(term, message.Raw(message.Pty(id)))
 
-		for m := range fromProgram {
-			if m.Logging() {
-				toTerminal <- [][]byte{m.Bytes()}
+	for m := range fromProgram {
+		if m.Logging() {
+			toTerminal <- [][]byte{m.Bytes()}
 
-				continue
-			}
+			continue
+		}
 
-			if buf.Buffered(m) {
-				continue
-			}
+		if buf.Buffered(m) {
+			continue
+		}
 
-			if m.IsStarted() {
-				statusq <- &Status{n: 1}
-			} else if m.IsStatus() {
-				statusq <- &Status{n: -1}
-			}
+		if m.IsStarted() {
+			statusq <- &Status{n: 1}
+		} else if m.IsStatus() {
+			statusq <- &Status{n: -1}
+		}
 
-			bs := append(buf.Routing(), m.Bytes())
+		bs := append(buf.Routing(), m.Bytes())
+		/*
 			logf(toTerminal, "mux sent {")
 			for _, b := range bs {
 				logf(toTerminal, "mux sent: %s", message.Raw(b))
 			}
 			logf(toTerminal, "}")
+		*/
 
-			toTerminal <- bs
-		}
+		toTerminal <- bs
+	}
 
 	_ = cmd.Wait()
 }
@@ -188,16 +189,16 @@ func main() {
 		return
 	}
 
-	done       := make(chan struct{})
+	done := make(chan struct{})
 	fromServer := comms.Chunk(os.Stdin)
-	id         := ""
-	nested     := 0
-	next       := comms.Counter(1)
-	routing    := []*message.T{}
-	status     := (*Status)(nil)
-	statusq    := make(chan *Status, 1) // Pty ID + exit status.
-	stream     := map[string]chan *message.T{}
-	toServer   := comms.Write(os.Stdout, done)
+	id := ""
+	nested := 0
+	next := comms.Counter(1)
+	routing := []*message.T{}
+	status := (*Status)(nil)
+	statusq := make(chan *Status, 1) // Pty ID + exit status.
+	stream := map[string]chan *message.T{}
+	toServer := comms.Write(os.Stdout, done)
 
 	defer func() {
 		rv := 0

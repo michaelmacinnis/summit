@@ -133,11 +133,11 @@ func main() {
 					resize(toServer, buf, 0)
 				} else if m.IsStatus() {
 					running--
-	
+
 					if running == 0 {
 						errors.Exit(m.Status())
 					}
-	
+
 					resize(toServer, buf, -1)
 				}
 

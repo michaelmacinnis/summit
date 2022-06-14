@@ -10,9 +10,6 @@ import (
 )
 
 type T struct {
-	// TODO: Can this just be the default?
-	IgnoreBlankTerm bool
-
 	sync.RWMutex
 
 	prefix []*message.T
@@ -51,7 +48,7 @@ func (b *buffer) Buffered(m *message.T) bool {
 		if m.IsPty() {
 			b.buffer = append(b.buffer, m.Bytes())
 		} else if m.IsTerm() {
-			if m.Term() != "" || !b.IgnoreBlankTerm {
+			if m.Term() != "" {
 				if len(b.prefix) > 0 && b.prefix[0].IsTerm() {
 					b.buffer[0] = m.Bytes()
 				}
