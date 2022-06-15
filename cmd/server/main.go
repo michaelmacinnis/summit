@@ -14,7 +14,6 @@ import (
 	"github.com/michaelmacinnis/summit/pkg/buffer"
 	"github.com/michaelmacinnis/summit/pkg/comms"
 	"github.com/michaelmacinnis/summit/pkg/config"
-	"github.com/michaelmacinnis/summit/pkg/errors" // TODO: Remove this package.
 	"github.com/michaelmacinnis/summit/pkg/message"
 )
 
@@ -99,15 +98,21 @@ func launch(path string) (*exec.Cmd, chan *message.T, chan [][]byte) {
 	cmd := exec.Command(path, "-l", "main")
 
 	in, err := cmd.StdinPipe()
-	errors.On(err).Die("stdin error")
+	if err != nil {
+		panic(err.Error())
+	}
 
 	out, err := cmd.StdoutPipe()
-	errors.On(err).Die("stdout error")
+	if err != nil {
+		panic(err.Error())
+	}
 
 	cmd.Stderr = os.Stderr
 
 	err = cmd.Start()
-	errors.On(err).Die("start error")
+	if err != nil {
+		panic(err.Error())
+	}
 
 	return cmd, comms.Chunk(out), comms.Write(in)
 }
@@ -116,13 +121,17 @@ func listen(accepted chan net.Conn) {
 	os.Remove(config.Socket())
 
 	l, err := net.Listen("unix", config.Socket())
-	errors.On(err).Die("listen error")
+	if err != nil {
+		panic(err.Error())
+	}
 
 	defer l.Close()
 
 	for {
 		conn, err := l.Accept()
-		errors.On(err).Die("accept error")
+		if err != nil {
+			panic(err.Error())
+		}
 
 		println("Got connection.")
 
