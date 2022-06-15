@@ -129,8 +129,6 @@ func main() {
 			if m.Is(message.Command) {
 				if m.IsStarted() {
 					running++
-
-					resize(toServer, buf, 0)
 				} else if m.IsStatus() {
 					running--
 

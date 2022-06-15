@@ -90,66 +90,76 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan *Sta
 		_ = f.Close() // Best effort.
 	}()
 
+	dst := buffer.New(term)
 	fromProgram := comms.Chunk(f)
 	fromTerminal := in
+	nested := 0
+	src := buffer.New(term, message.Raw(message.Pty(id)))
 	toProgram := comms.Write(f)
 	toTerminal := out
 
-	go func() {
-		buf := buffer.New(term)
+	for {
+		select {
+		case m, ok := <-fromTerminal:
+			if !ok || m == nil {
+				goto done
+			}
 
-		for m := range fromTerminal {
-			if buf.Buffered(m) {
+			if dst.Buffered(m) {
 				continue
 			}
 
-			routing := buf.Routing()
-			if len(routing) == 1 && !m.IsRun() {
-				ts := m.TerminalSize()
-				if ts != nil {
-					if err := terminal.SetSize(f, ts); err != nil {
-						logf(out, "[%s] error: setting size: %s", id, err.Error())
-					}
-				} else {
-					toProgram <- [][]byte{m.Bytes()}
+			routing := dst.Routing()
+			if len(routing) > 1 || m.IsRun() {
+				if nested == 0 {
+					logf(out, "[%s] error: sending commands to non-mux", id)
+				}
+				toProgram <- append(routing, m.Bytes())
+			} else if ts := m.TerminalSize(); ts != nil {
+				if err := terminal.SetSize(f, ts); err != nil {
+					logf(out, "[%s] error: setting size: %s", id, err.Error())
 				}
 			} else {
-				toProgram <- append(routing, m.Bytes())
+				toProgram <- [][]byte{m.Bytes()}
 			}
-		}
-	}()
 
-	buf := buffer.New(term, message.Raw(message.Pty(id)))
-
-	for m := range fromProgram {
-		if m.Logging() {
-			toTerminal <- [][]byte{m.Bytes()}
-
-			continue
-		}
-
-		if buf.Buffered(m) {
-			continue
-		}
-
-		if m.IsStarted() {
-			statusq <- &Status{n: 1}
-		} else if m.IsStatus() {
-			statusq <- &Status{n: -1}
-		}
-
-		bs := append(buf.Routing(), m.Bytes())
-		/*
-			logf(toTerminal, "mux sent {")
-			for _, b := range bs {
-				logf(toTerminal, "mux sent: %s", message.Raw(b))
+		case m, ok := <-fromProgram:
+			if !ok || m == nil {
+				goto done
 			}
-			logf(toTerminal, "}")
-		*/
 
-		toTerminal <- bs
+			if m.Logging() {
+				toTerminal <- [][]byte{m.Bytes()}
+
+				continue
+			}
+
+			if src.Buffered(m) {
+				continue
+			}
+
+			if m.IsStarted() {
+				nested++
+				statusq <- &Status{n: 1}
+			} else if m.IsStatus() {
+				nested--
+				statusq <- &Status{n: -1}
+			}
+
+			bs := append(src.Routing(), m.Bytes())
+			/*
+				logf(toTerminal, "mux sent {")
+				for _, b := range bs {
+					logf(toTerminal, "mux sent: %s", message.Raw(b))
+				}
+				logf(toTerminal, "}")
+			*/
+
+			toTerminal <- bs
+		}
 	}
 
+done:
 	_ = cmd.Wait()
 }
 

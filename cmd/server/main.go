@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"os/exec"
@@ -18,27 +17,6 @@ import (
 	"github.com/michaelmacinnis/summit/pkg/errors"
 	"github.com/michaelmacinnis/summit/pkg/message"
 )
-
-func Write(wc io.WriteCloser) chan [][]byte {
-	c := make(chan [][]byte)
-
-	go func() {
-		defer wc.Close()
-
-		for bs := range c {
-			for _, b := range bs {
-				if b != nil {
-					_, err := wc.Write(b)
-					if err != nil {
-						println(err.Error())
-					}
-				}
-			}
-		}
-	}()
-
-	return c
-}
 
 var (
 	client = config.Get("SUMMIT_CLIENT", "summit-client")
@@ -131,7 +109,7 @@ func launch(path string) (*exec.Cmd, chan *message.T, chan [][]byte) {
 	err = cmd.Start()
 	errors.On(err).Die("start error")
 
-	return cmd, comms.Chunk(out), Write(in)
+	return cmd, comms.Chunk(out), comms.Write(in)
 }
 
 func listen(accepted chan net.Conn) {
