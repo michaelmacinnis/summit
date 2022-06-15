@@ -34,7 +34,11 @@ func resize(w io.Writer, buf *buffer.T, n int) {
 
 func main() {
 	rv := 0
-	defer os.Exit(rv)
+	defer func() {
+		if rv != 0 {
+			os.Exit(rv)
+		}
+	}()
 
 	j := flag.String("e", "", "environment (as a JSON array)")
 	path := flag.String("p", "", "routing path")

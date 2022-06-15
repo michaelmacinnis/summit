@@ -175,7 +175,11 @@ func wd(env []string) string {
 
 func main() {
 	rv := 0
-	defer os.Exit(rv)
+	defer func() {
+		if rv != 0 {
+			os.Exit(rv)
+		}
+	}()
 
 	request := false
 
