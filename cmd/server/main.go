@@ -14,7 +14,7 @@ import (
 	"github.com/michaelmacinnis/summit/pkg/buffer"
 	"github.com/michaelmacinnis/summit/pkg/comms"
 	"github.com/michaelmacinnis/summit/pkg/config"
-	"github.com/michaelmacinnis/summit/pkg/errors"
+	"github.com/michaelmacinnis/summit/pkg/errors" // TODO: Remove this package.
 	"github.com/michaelmacinnis/summit/pkg/message"
 )
 

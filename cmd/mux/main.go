@@ -174,6 +174,9 @@ func wd(env []string) string {
 }
 
 func main() {
+	rv := 0
+	defer os.Exit(rv)
+
 	request := false
 
 	flag.Usage = func() {
@@ -196,6 +199,7 @@ func main() {
 	} else if defaulted && terminal.IsTTY() {
 		flag.Usage()
 
+		rv = 1
 		return
 	}
 
@@ -211,7 +215,6 @@ func main() {
 	toServer := comms.Write(os.Stdout, done)
 
 	defer func() {
-		rv := 0
 		if status != nil {
 			rv = status.rv
 

@@ -32,17 +32,17 @@ func IsTTY() bool {
 	return term.IsTerminal(int(stdin.Fd()))
 }
 
-func MakeRaw() (func() error, error) {
+func MakeRaw() (func(), error) {
 	fd := int(stdin.Fd())
 
 	prev, err := term.MakeRaw(fd)
 
-	return func() error {
-		return term.Restore(fd, prev)
+	return func() {
+		_ = term.Restore(fd, prev)
 	}, err
 }
 
-func OnResize(f func(ts *Size)) func() error {
+func OnResize(f func(ts *Size)) func() {
 	signals := make(chan os.Signal, 1)
 
 	signal.Notify(signals, unix.SIGWINCH)
@@ -53,11 +53,9 @@ func OnResize(f func(ts *Size)) func() error {
 		}
 	}()
 
-	return func() error {
+	return func() {
 		signal.Stop(signals)
 		close(signals)
-
-		return nil
 	}
 }
 

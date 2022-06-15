@@ -13,7 +13,6 @@ import (
 	"github.com/michaelmacinnis/summit/pkg/buffer"
 	"github.com/michaelmacinnis/summit/pkg/comms"
 	"github.com/michaelmacinnis/summit/pkg/config"
-	"github.com/michaelmacinnis/summit/pkg/errors"
 	"github.com/michaelmacinnis/summit/pkg/message"
 	"github.com/michaelmacinnis/summit/pkg/terminal"
 )
@@ -34,21 +33,30 @@ func resize(w io.Writer, buf *buffer.T, n int) {
 }
 
 func main() {
-	defer errors.Exit(0)
+	rv := 0
+	defer os.Exit(rv)
 
 	j := flag.String("e", "", "environment (as a JSON array)")
 	path := flag.String("p", "", "routing path")
 	config.Parse()
 
 	restore, err := terminal.MakeRaw()
-	errors.On(err).Die("failed to put terminal in raw mode")
+	if err != nil {
+		println("failed to put terminal in raw mode:", err.Error())
 
-	errors.AtExit(restore)
+		return
+	}
+
+	defer restore()
 
 	c, err := net.Dial("unix", config.Socket())
-	errors.On(err).Die("failed to connect to server")
+	if err != nil {
+		println("failed to connect to server:", err.Error())
 
-	errors.AtExit(c.Close)
+		return
+	}
+
+	defer c.Close()
 
 	fromServer := comms.Chunk(c)
 	fromTerminal := comms.Chunk(os.Stdin)
@@ -93,9 +101,11 @@ func main() {
 	// Continue to send terminal size changes.
 	// These notifications are converted to look like terminal input so
 	// that they are not interleaved with other output when writing.
-	terminal.OnResize(func(ts *terminal.Size) {
+	cleanup := terminal.OnResize(func(ts *terminal.Size) {
 		fromTerminal <- message.Raw(message.TerminalSize(ts))
 	})
+
+	defer cleanup()
 
 	newline := false
 	running := 1
@@ -133,7 +143,8 @@ func main() {
 					running--
 
 					if running == 0 {
-						errors.Exit(m.Status())
+						rv = m.Status()
+						return
 					}
 
 					resize(toServer, buf, -1)
