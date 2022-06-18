@@ -55,7 +55,7 @@ func (m *message) strings(k string) (elems []string) {
 	elems = make([]string, len(a))
 
 	for k, v := range a {
-		elems[k] = v.(string)
+		elems[k] = cast[string](v)
 	}
 
 	return

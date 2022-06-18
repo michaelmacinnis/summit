@@ -7,8 +7,7 @@ import (
 )
 
 func Command() ([]string, bool) {
-	args := flag.Args()
-	if len(args) > 0 {
+	if args := flag.Args(); len(args) > 0 {
 		return args, false
 	}
 
@@ -47,6 +46,7 @@ func Socket() string {
 	return socket
 }
 
+//nolint:gochecknoglobals
 var (
 	command = Get("SUMMIT_COMMAND", Get("SHELL", "/bin/bash"))
 	socket  = Get("SUMMIT_SOCKET", "/tmp/summit.socket")

@@ -199,11 +199,13 @@ func main() {
 
 	if request {
 		os.Stdout.Write(message.Run(args, os.Environ()))
+
 		return
 	} else if defaulted && terminal.IsTTY() {
 		flag.Usage()
 
 		rv = 1
+
 		return
 	}
 
@@ -304,8 +306,6 @@ func main() {
 			selected <- m
 
 		case s := <-statusq:
-			logf(toServer, "status len(stream)=%d, nested=%d, n=%d, term='%s', pty='%s', rv=%d", len(stream), nested, s.n, s.term, s.pty, s.rv)
-
 			if s.n != 0 {
 				nested += s.n
 

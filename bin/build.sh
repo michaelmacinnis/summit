@@ -3,7 +3,7 @@
 # Figure out where we are.
 Dir=$(dirname -- $(readlink -f -- "$0"))
 
-cd "$Dir"
+cd "${Dir}/.."
 
 go build ./cmd/client
 go build ./cmd/mux

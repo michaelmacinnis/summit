@@ -51,6 +51,7 @@ func (l *T) Chunk() *message.T {
 		select {
 		case t := <-l.messages:
 			return t
+
 		default:
 			state := l.state(l)
 			if state != nil {
@@ -127,7 +128,7 @@ func afterCloseBrace(l *T) action {
 }
 
 func afterCloseBraceDash(l *T) action {
-	return on(l, 0x1b, afterCloseBraceDashEscape)
+	return on(l, message.ESC, afterCloseBraceDashEscape)
 }
 
 func afterCloseBraceDashEscape(l *T) action {
@@ -136,6 +137,7 @@ func afterCloseBraceDashEscape(l *T) action {
 	switch r {
 	case eof:
 		return nil
+
 	case '\\':
 		l.accept(r, w)
 		l.emit(message.Command, l.text())
@@ -175,13 +177,17 @@ func base64UntilCloseBrace(l *T) action {
 		switch r {
 		case eof:
 			return nil
+
 		case '}':
 			l.accept(r, w)
+
 			return afterCloseBrace
+
 		default:
 			if !base64Char(r) {
 				return text
 			}
+
 			l.accept(r, w)
 		}
 	}
@@ -193,9 +199,12 @@ func on(l *T, expected rune, perform action) action {
 	switch actual {
 	case eof:
 		return nil
+
 	case expected:
 		l.accept(actual, width)
+
 		return perform
+
 	default:
 		return text
 	}
@@ -208,11 +217,15 @@ func text(l *T) action {
 		switch r {
 		case eof:
 			l.emit(message.Text, l.text())
+
 			return nil
-		case 0x1b:
+
+		case message.ESC:
 			l.emit(message.Text, l.text())
 			l.accept(r, w)
+
 			return afterEscape
+
 		default: // Continue and get next character.
 			l.accept(r, w)
 		}

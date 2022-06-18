@@ -8,6 +8,9 @@ import (
 	"encoding/json"
 )
 
+const ESC = 0x1b
+
+//nolint:gochecknoglobals
 var (
 	CRLF = []byte{13, 10}
 	EOT  = []byte{4}
@@ -26,9 +29,9 @@ func Deserialize(b []byte) map[string]interface{} {
 	d := json.NewDecoder(base64.NewDecoder(b64, bytes.NewBuffer(b[lpm:n])))
 
 	m := map[string]interface{}{}
-	err := d.Decode(&m)
-	if err != nil {
+	if err := d.Decode(&m); err != nil {
 		println(err.Error())
+
 		return nil
 	}
 
@@ -41,8 +44,7 @@ func Serialize(m map[string]interface{}) []byte {
 	inner := base64.NewEncoder(b64, b)
 	e := json.NewEncoder(inner)
 
-	err := e.Encode(m)
-	if err != nil {
+	if err := e.Encode(m); err != nil {
 		return nil
 	}
 
@@ -63,11 +65,12 @@ func Serialize(m map[string]interface{}) []byte {
 	return s
 }
 
+//nolint:gochecknoglobals
 var (
 	b64 = base64.StdEncoding
 	lpm = len(pm)
 
 	// Control messages have the form: ESC^-{Base 64 encoded JSON}-ESC\.
-	pm = []byte{0x1b, '^', '-', '{'}  // ESC ^ (PM) then "-{".
-	st = []byte{'}', '-', 0x1b, '\\'} // "}-" then ESC \ (ST).
+	pm = []byte{ESC, '^', '-', '{'}  // ESC ^ (PM) then "-{".
+	st = []byte{'}', '-', ESC, '\\'} // "}-" then ESC \ (ST).
 )

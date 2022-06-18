@@ -13,6 +13,7 @@ import (
 
 type Size = pty.Winsize
 
+//nolint:gochecknoglobals
 var (
 	SetSize       = pty.Setsize
 	StartWithSize = pty.StartWithSize
@@ -22,6 +23,7 @@ func GetSize() *Size {
 	ts, err := pty.GetsizeFull(stdin)
 	if err != nil {
 		println("error getting window size:", err.Error())
+
 		return nil
 	}
 
@@ -59,4 +61,4 @@ func OnResize(f func(ts *Size)) func() {
 	}
 }
 
-var stdin = os.Stdin
+var stdin = os.Stdin //nolint:gochecknoglobals

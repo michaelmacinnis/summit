@@ -19,7 +19,7 @@ func Counter(initial uint64) chan string {
 		i := initial
 
 		for {
-			next <- strconv.FormatUint(i, 10)
+			next <- strconv.FormatUint(i, 10) //nolint:gomnd
 			i++
 		}
 	}()

@@ -2,12 +2,14 @@ linters:
   enable-all: true
   disable:
     - exhaustivestruct
+    - funlen
     - golint
     - interfacer
     - maligned
     - paralleltest
     - scopelint
     - typecheck
+    - varnamelen
     - wrapcheck
 
 linters-settings:

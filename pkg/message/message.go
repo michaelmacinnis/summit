@@ -79,6 +79,7 @@ func (m *message) Bytes() []byte {
 	if m.raw == nil && m.kv != nil && m.Is(Command) {
 		m.raw = Serialize(m.kv)
 	}
+
 	return m.raw
 }
 
@@ -102,6 +103,7 @@ func (m *message) Parsed() map[string]interface{} {
 	if m.kv == nil && m.raw != nil && m.Is(Command) {
 		m.kv = Deserialize(m.raw)
 	}
+
 	return m.kv
 }
 
@@ -115,6 +117,7 @@ func (m *message) String() string {
 	}
 
 	s := strconv.Quote(string(m.raw))
+
 	if kv != nil {
 		cls = Command
 		s = fmt.Sprintf("%v", kv)
