@@ -54,9 +54,6 @@ func session(id string, in chan *message.T, out chan [][]byte, statusq chan *Sta
 	m := <-in
 	args := m.Args()
 
-	// TODO: When launched as a shim for a command that does not exist,
-	//       this triggers a resize message but this mux is no longer
-	//       here to receive it.
 	logf(out, "[%s] sending new pty id", id)
 	out <- [][]byte{term.Bytes(), message.Pty(id), message.Started()}
 
